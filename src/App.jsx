@@ -555,8 +555,10 @@ const ProfessorDashboard = ({ navigate }) => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-16">
                         {filtered.map(s => (
                             <div key={s.id} className="bg-[#1C1C1E]/80 backdrop-blur-sm rounded-3xl p-5 border border-gray-800 shadow-2xl group transition-all relative overflow-hidden">
-                                {/* MARCA DE AGUA (PESA RUSA/DUMBBELL) */}
-                                <Dumbbell className="absolute -right-4 -bottom-4 text-white/5 w-24 h-24 -rotate-12 pointer-events-none group-hover:text-[#3ABFBC]/10 transition-colors" />
+                                {/* ICONO DE PESAS COMO MARCA DE AGUA ELEGANTE */}
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                                    <Dumbbell className="text-white opacity-[0.03] w-40 h-40 -rotate-12 group-hover:scale-110 transition-transform duration-700" />
+                                </div>
                                 
                                 <div className="flex items-center mb-6 relative z-10">
                                     <div className="w-12 h-12 rounded-2xl bg-[#3ABFBC] flex items-center justify-center mr-4 shadow-lg group-hover:scale-110 transition-transform"><User size={24} color="black" /></div>
@@ -566,21 +568,17 @@ const ProfessorDashboard = ({ navigate }) => {
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-4 gap-2 relative z-10">
-                                    <button onClick={() => { setSelectedStudent(s); setShowInfo(true); }} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
-                                        <Info size={16} strokeWidth={2.5}/>
-                                        <span className="text-[7px] font-black mt-1 uppercase text-center">Info</span>
+                                    <button onClick={() => { setSelectedStudent(s); setShowInfo(true); }} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
+                                        <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><Info size={16} strokeWidth={2.5}/> Info</span>
                                     </button>
-                                    <button onClick={() => setResetConfirm({ visible: true, student: s, loading: false })} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-amber-500 hover:bg-amber-500 hover:text-black hover:border-amber-500 active:scale-95 transition-all duration-200 shadow-sm">
-                                        <Key size={16} strokeWidth={2.5}/>
-                                        <span className="text-[7px] font-black mt-1 uppercase text-center">Reset</span>
+                                    <button onClick={() => setResetConfirm({ visible: true, student: s, loading: false })} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-amber-500 hover:bg-amber-500 hover:text-black hover:border-amber-500 active:scale-95 transition-all duration-200 shadow-sm">
+                                        <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><Key size={16} strokeWidth={2.5}/> Reset</span>
                                     </button>
-                                    <button onClick={() => navigate('viewRoutine', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
-                                        <History size={16} strokeWidth={2.5}/>
-                                        <span className="text-[7px] font-black mt-1 uppercase text-center">Histo</span>
+                                    <button onClick={() => navigate('viewRoutine', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
+                                        <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><History size={16} strokeWidth={2.5}/> Histo</span>
                                     </button>
-                                    <button onClick={() => navigate('createRoutineGroup', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-[#3ABFBC] hover:bg-[#3ABFBC] hover:text-black hover:border-[#3ABFBC] active:scale-95 transition-all duration-200 shadow-sm">
-                                        <Dumbbell size={16} strokeWidth={2.5}/>
-                                        <span className="text-[7px] font-black mt-1 uppercase italic text-center">Nueva</span>
+                                    <button onClick={() => navigate('createRoutineGroup', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-[#3ABFBC] hover:bg-[#3ABFBC] hover:text-black hover:border-[#3ABFBC] active:scale-95 transition-all duration-200 shadow-sm">
+                                        <span className="text-[7px] font-black mt-1 uppercase italic text-center flex flex-col items-center"><Dumbbell size={16} strokeWidth={2.5}/> Nueva</span>
                                     </button>
                                 </div>
                             </div>
@@ -964,18 +962,16 @@ const App = () => {
     };
 
     return (
-        <div className="min-h-screen bg-black relative flex flex-col">
-            {/* FONDO GLOBAL CON IMAGEN Y GRADIENTE OSCURO */}
-            {currentScreen !== 'login' && (
-                <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-                    <img 
-                        src={BG_IMAGE_URL} 
-                        className="w-full h-full object-cover opacity-20 grayscale" 
-                        alt="Global Background" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-b from-black via-black/60 to-black" />
-                </div>
-            )}
+        <div className="min-h-screen bg-black relative flex flex-col overflow-x-hidden">
+            {/* FONDO GLOBAL IDÉNTICO AL LOGIN - MEJORADO */}
+            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+                <img 
+                    src={BG_IMAGE_URL} 
+                    className="w-full h-full object-cover opacity-50 grayscale" 
+                    alt="Global Background" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black" />
+            </div>
             
             <div className="relative z-10 flex flex-col min-h-screen">
                 {renderScreen()}
