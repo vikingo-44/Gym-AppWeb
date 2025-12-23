@@ -554,10 +554,13 @@ const ProfessorDashboard = ({ navigate }) => {
                 {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-16">
                         {filtered.map(s => (
-                            <div key={s.id} className="bg-[#1C1C1E]/80 backdrop-blur-sm rounded-3xl p-5 border border-gray-800 shadow-2xl group transition-all relative overflow-hidden">
-                                {/* ICONO DE PESAS COMO MARCA DE AGUA ELEGANTE */}
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                                    <Dumbbell className="text-white opacity-[0.03] w-40 h-40 -rotate-12 group-hover:scale-110 transition-transform duration-700" />
+                            <div key={s.id} className="bg-[#1C1C1E]/80 backdrop-blur-sm rounded-3xl p-5 border border-gray-800 shadow-2xl group transition-all relative overflow-hidden min-h-[160px]">
+                                {/* ICONO DE PESAS COMO MARCA DE AGUA (AJUSTADO A POSICIÓN INFERIOR DERECHA) */}
+                                <div className="absolute -right-4 -bottom-4 pointer-events-none z-0">
+                                    <Dumbbell 
+                                        className="text-white opacity-[0.04] w-28 h-28 -rotate-12 group-hover:scale-110 transition-transform duration-700" 
+                                        strokeWidth={3} // Mayor grosor para evitar el look "lineal" y dar cuerpo a la silueta
+                                    />
                                 </div>
                                 
                                 <div className="flex items-center mb-6 relative z-10">
