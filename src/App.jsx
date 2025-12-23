@@ -118,7 +118,7 @@ const Input = ({ placeholder, value, onChange, type = 'text', Icon, isPassword =
             <div className="flex items-center rounded-2xl h-14 px-4 border border-gray-800 bg-[#1C1C1E] focus-within:border-[#3ABFBC] transition-all shadow-inner">
                 {Icon && <Icon size={18} className="text-[#A9A9A9] mr-3" />}
                 <input
-                    className="flex-1 bg-transparent text-white text-base font-medium outline-none placeholder:text-gray-600"
+                    className="flex-1 bg-transparent text-white text-[16px] font-medium outline-none placeholder:text-gray-600"
                     style={{ colorScheme: 'dark' }} 
                     placeholder={placeholder}
                     value={value || ''}
@@ -255,7 +255,7 @@ const ResetPasswordModal = ({ isVisible, onClose, targetUser, mode = 'profile' }
 
     return (
         <div className="fixed inset-0 z-[210] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-[#1C1C1E] w-full max-w-sm rounded-[2rem] border border-gray-800 p-8 shadow-2xl text-left">
+            <div className="bg-[#1C1C1E] w-full max-sm:w-[95%] max-w-sm rounded-[2rem] border border-gray-800 p-8 shadow-2xl text-left">
                 <div className="text-center mb-6">
                     <Key size={32} strokeWidth={2.5} className="text-amber-500 mx-auto mb-2" />
                     <h2 className="text-xl font-black italic text-white uppercase tracking-tighter">SEGURIDAD</h2>
@@ -375,7 +375,10 @@ const ProfessorDashboard = ({ navigate }) => {
         }
     };
 
-    const filtered = (students || []).filter(s => (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || (s.dni || "").toString().includes(search));
+    // LOGICA ACTUALIZADA: Filtro y orden alfabetico A-Z
+    const filtered = (students || [])
+        .filter(s => (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || (s.dni || "").toString().includes(search))
+        .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
 
     return (
         <div className="min-h-screen bg-black flex flex-col text-left">
@@ -404,35 +407,35 @@ const ProfessorDashboard = ({ navigate }) => {
             <main className="p-4 flex-1">
                 <div className="relative mb-6 max-w-xl mx-auto">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
-                    <input className="w-full bg-[#1C1C1E] h-12 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-xs shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
+                    <input className="w-full bg-[#1C1C1E] h-12 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
                 </div>
 
                 {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-16">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pb-16">
                         {filtered.map(s => (
                             <div key={s.id} className="bg-[#1C1C1E] rounded-3xl p-5 border border-gray-800 shadow-2xl group transition-all">
                                 <div className="flex items-center mb-6">
                                     <div className="w-12 h-12 rounded-2xl bg-[#3ABFBC] flex items-center justify-center mr-4 shadow-lg group-hover:scale-110 transition-transform"><User size={24} color="black" /></div>
-                                    <div className="min-w-0 flex-1">
+                                    <div className="min-w-0 flex-1 overflow-hidden">
                                         <h3 className="text-sm font-black italic text-white uppercase truncate">{s.nombre}</h3>
-                                        <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1">DNI: {s.dni}</p>
+                                        <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate">{s.email}</p>
                                     </div>
                                 </div>
-                                {/* BOTONES MINIMALISTAS CON ICONOS GRUESOS */}
+                                {/* BOTONES CON EFECTO DE INVERSIÓN AL HOVER */}
                                 <div className="grid grid-cols-4 gap-2">
-                                    <button onClick={() => { setSelectedStudent(s); setShowInfo(true); }} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-white active:bg-white/10 transition-all shadow-sm">
+                                    <button onClick={() => { setSelectedStudent(s); setShowInfo(true); }} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
                                         <Info size={16} strokeWidth={2.5}/>
                                         <span className="text-[7px] font-black mt-1 uppercase text-center">Info</span>
                                     </button>
-                                    <button onClick={() => setResetConfirm({ visible: true, student: s, loading: false })} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-amber-500 active:bg-amber-500/10 transition-all shadow-sm">
+                                    <button onClick={() => setResetConfirm({ visible: true, student: s, loading: false })} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-amber-500 hover:bg-amber-500 hover:text-black hover:border-amber-500 active:scale-95 transition-all duration-200 shadow-sm">
                                         <Key size={16} strokeWidth={2.5}/>
                                         <span className="text-[7px] font-black mt-1 uppercase text-center">Reset</span>
                                     </button>
-                                    <button onClick={() => navigate('viewRoutine', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-white active:bg-white/10 transition-all shadow-sm">
+                                    <button onClick={() => navigate('viewRoutine', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
                                         <History size={16} strokeWidth={2.5}/>
                                         <span className="text-[7px] font-black mt-1 uppercase text-center">Histo</span>
                                     </button>
-                                    <button onClick={() => navigate('createRoutineGroup', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-[#3ABFBC] active:bg-[#3ABFBC]/10 transition-all shadow-sm">
+                                    <button onClick={() => navigate('createRoutineGroup', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-[#3ABFBC] hover:bg-[#3ABFBC] hover:text-black hover:border-[#3ABFBC] active:scale-95 transition-all duration-200 shadow-sm">
                                         <Dumbbell size={16} strokeWidth={2.5}/>
                                         <span className="text-[7px] font-black mt-1 uppercase italic text-center">Nueva</span>
                                     </button>
@@ -745,7 +748,17 @@ const App = () => {
             let appleIcon = document.querySelector("link[rel~='apple-touch-icon']");
             if (!appleIcon) { appleIcon = document.createElement('link'); appleIcon.rel = 'apple-touch-icon'; document.head.appendChild(appleIcon); }
             appleIcon.href = LOGO_URL;
-            document.title = "ND Training";
+            document.title = "Peakfit";
+            
+            // CONFIGURACIÓN PARA EVITAR ZOOM Y COMPORTARSE COMO APP
+            let metaViewport = document.querySelector('meta[name="viewport"]');
+            if (!metaViewport) {
+                metaViewport = document.createElement('meta');
+                metaViewport.name = "viewport";
+                document.head.appendChild(metaViewport);
+            }
+            metaViewport.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content";
+
             const metaTheme = document.querySelector('meta[name="theme-color"]') || document.createElement('meta');
             metaTheme.name = "theme-color"; metaTheme.content = "#000000";
             if (!metaTheme.parentNode) document.head.appendChild(metaTheme);
@@ -962,13 +975,18 @@ const AppWrapper = () => (
             
             :root { --sat: env(safe-area-inset-top); --sab: env(safe-area-inset-bottom); }
 
-            body { 
+            html, body { 
                 font-family: 'Inter', sans-serif; 
                 background-color: black; 
                 margin: 0; 
                 color: white; 
                 -webkit-font-smoothing: antialiased; 
                 overflow-x: hidden;
+                width: 100%;
+                height: 100%;
+                /* BLOQUEO DE ZOOM EN MÓVIL */
+                touch-action: pan-x pan-y;
+                -webkit-text-size-adjust: 100%;
                 user-select: none;
                 -webkit-tap-highlight-color: transparent;
                 overscroll-behavior-y: none;
@@ -980,8 +998,13 @@ const AppWrapper = () => (
 
             button { touch-action: manipulation; }
 
-            input::placeholder { color: #A9A9A9; font-weight: 700; font-size: 8px; letter-spacing: 0.15em; opacity: 0.75; text-transform: uppercase; }
-            textarea::placeholder { color: #A9A9A9; font-weight: 700; font-size: 8px; letter-spacing: 0.15em; opacity: 0.75; text-transform: uppercase; }
+            /* FUENTE DE 16PX PARA EVITAR ZOOM EN BUSCADORES */
+            input, textarea, select {
+                font-size: 16px !important;
+            }
+
+            input::placeholder { color: #A9A9A9; font-weight: 700; font-size: 10px; letter-spacing: 0.15em; opacity: 0.75; text-transform: uppercase; }
+            textarea::placeholder { color: #A9A9A9; font-weight: 700; font-size: 10px; letter-spacing: 0.15em; opacity: 0.75; text-transform: uppercase; }
             
             ::-webkit-scrollbar { width: 4px; }
             ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
