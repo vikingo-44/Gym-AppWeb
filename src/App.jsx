@@ -715,7 +715,7 @@ const App = () => {
             let appleIcon = document.querySelector("link[rel~='apple-touch-icon']");
             if (!appleIcon) { appleIcon = document.createElement('link'); appleIcon.rel = 'apple-touch-icon'; document.head.appendChild(appleIcon); }
             appleIcon.href = LOGO_URL;
-            document.title = "Peakfit";
+            document.title = "ND Training";
             const metaTheme = document.querySelector('meta[name="theme-color"]') || document.createElement('meta');
             metaTheme.name = "theme-color"; metaTheme.content = "#000000";
             if (!metaTheme.parentNode) document.head.appendChild(metaTheme);
