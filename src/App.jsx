@@ -14,6 +14,7 @@ import {
 // ----------------------------------------------------------------------
 const API_URL = "https://gym-app-backend-e9bn.onrender.com"; 
 const LOGO_URL = "https://raw.githubusercontent.com/vikingo-44/Gym-App-Backend/main/assets/logoND.png";
+const BG_IMAGE_URL = "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1500&auto=format&fit=crop";
 
 const formatDisplayDate = (dateString) => {
     if (!dateString) return 'SIN FECHA';
@@ -462,7 +463,7 @@ const LoginPage = () => {
     return (
         <div className="min-h-screen bg-black flex items-center justify-center p-8 relative overflow-hidden text-center">
             <div className="absolute inset-0 z-0">
-                <img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1500&auto=format&fit=crop" className="w-full h-full object-cover opacity-50 grayscale" />
+                <img src={BG_IMAGE_URL} className="w-full h-full object-cover opacity-50 grayscale" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black" />
             </div>
             <div className="w-full max-sm:px-4 max-w-sm z-10 flex flex-col items-center">
@@ -522,14 +523,13 @@ const ProfessorDashboard = ({ navigate }) => {
         .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
 
     return (
-        <div className="min-h-screen bg-black flex flex-col text-left">
+        <div className="flex flex-col text-left flex-1">
             <Notification msg={toast.msg} type={toast.type} onClose={() => setToast({ msg: '', type: '' })} />
             <ConfirmResetModal isVisible={resetConfirm.visible} student={resetConfirm.student} loading={resetConfirm.loading} onConfirm={handleConfirmReset} onClose={() => setResetConfirm({ visible: false, student: null, loading: false })} />
             <StudentInfoModal isVisible={showInfo} onClose={() => setShowInfo(false)} student={selectedStudent} onUpdate={refresh} />
             <ResetPasswordModal isVisible={showProfile} onClose={() => setShowProfile(false)} targetUser={userData} mode="profile" />
 
-            {/* HEADER MEJORADO PARA MÓVIL (SIN SUPERPOSICIÓN) */}
-            <header className="p-4 bg-[#1C1C1E] border-b border-gray-800 flex justify-between items-center sticky top-0 z-50 gap-2">
+            <header className="p-4 bg-[#1C1C1E]/80 backdrop-blur-md border-b border-gray-800 flex justify-between items-center sticky top-0 z-50 gap-2">
                 <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                     <img src={LOGO_URL} className="w-10 h-10 sm:w-14 sm:h-14 object-contain shrink-0" />
                     <div className="text-left min-w-0">
@@ -548,22 +548,24 @@ const ProfessorDashboard = ({ navigate }) => {
             <main className="p-4 flex-1">
                 <div className="relative mb-6 max-w-xl mx-auto">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
-                    <input className="w-full bg-[#1C1C1E] h-12 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
+                    <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-12 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
                 </div>
 
                 {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
-                    /* GRID ACTUALIZADO A 5 COLUMNAS EN DESKTOP (XL) */
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-16">
                         {filtered.map(s => (
-                            <div key={s.id} className="bg-[#1C1C1E] rounded-3xl p-5 border border-gray-800 shadow-2xl group transition-all">
-                                <div className="flex items-center mb-6">
+                            <div key={s.id} className="bg-[#1C1C1E]/80 backdrop-blur-sm rounded-3xl p-5 border border-gray-800 shadow-2xl group transition-all relative overflow-hidden">
+                                {/* MARCA DE AGUA (PESA RUSA/DUMBBELL) */}
+                                <Dumbbell className="absolute -right-4 -bottom-4 text-white/5 w-24 h-24 -rotate-12 pointer-events-none group-hover:text-[#3ABFBC]/10 transition-colors" />
+                                
+                                <div className="flex items-center mb-6 relative z-10">
                                     <div className="w-12 h-12 rounded-2xl bg-[#3ABFBC] flex items-center justify-center mr-4 shadow-lg group-hover:scale-110 transition-transform"><User size={24} color="black" /></div>
                                     <div className="min-w-0 flex-1 overflow-hidden">
                                         <h3 className="text-sm font-black italic text-white uppercase truncate">{s.nombre}</h3>
                                         <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate">{s.email}</p>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-4 gap-2 relative z-10">
                                     <button onClick={() => { setSelectedStudent(s); setShowInfo(true); }} className="flex flex-col items-center justify-center py-3 bg-black border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
                                         <Info size={16} strokeWidth={2.5}/>
                                         <span className="text-[7px] font-black mt-1 uppercase text-center">Info</span>
@@ -629,10 +631,10 @@ const StudentDashboard = ({ navigate }) => {
     }, [assignments]);
 
     return (
-        <div className="min-h-screen bg-black flex flex-col text-left">
+        <div className="flex flex-col text-left flex-1">
             <ResetPasswordModal isVisible={showProfile} onClose={() => setShowProfile(false)} targetUser={userData} mode="profile" />
             
-            <header className="p-4 bg-[#1C1C1E] border-b border-gray-800 flex justify-between items-center sticky top-0 z-50 text-left gap-2">
+            <header className="p-4 bg-[#1C1C1E]/80 backdrop-blur-md border-b border-gray-800 flex justify-between items-center sticky top-0 z-50 text-left gap-2">
                 <div className="flex items-center gap-2 sm:gap-4 min-w-0 text-left">
                     <img src={LOGO_URL} className="w-10 h-10 sm:w-14 sm:h-14 object-contain shrink-0" />
                     <div className="text-left min-w-0">
@@ -657,7 +659,7 @@ const StudentDashboard = ({ navigate }) => {
                                 <p className="text-gray-500 font-black uppercase tracking-widest text-[10px] italic">NO TENÉS RUTINAS ACTIVAS.</p>
                             </div>
                         ) : groupedAssignments.map(group => (
-                            <div key={group.id} className="rounded-[2rem] border border-[#3ABFBC]/20 bg-gradient-to-b from-[#1C1C1E] to-black overflow-hidden shadow-2xl">
+                            <div key={group.id} className="rounded-[2rem] border border-[#3ABFBC]/20 bg-gradient-to-b from-[#1C1C1E]/80 to-black/80 backdrop-blur-sm overflow-hidden shadow-2xl">
                                 <div onClick={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)} className="p-6 flex justify-between items-center cursor-pointer active:bg-white/5 transition-colors">
                                     <div className="flex-1 min-w-0 pr-4 text-left">
                                         <h3 className="text-2xl font-black italic uppercase text-[#3ABFBC] tracking-tighter leading-none mb-3 truncate">{group.name}</h3>
@@ -678,7 +680,7 @@ const StudentDashboard = ({ navigate }) => {
                                 {expandedGroup === group.id && (
                                     <div className="bg-black/40 border-t border-gray-800/50 p-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
                                         {group.items.map(a => (
-                                            <div key={a.id} className="bg-[#1C1C1E] border border-gray-800 rounded-3xl overflow-hidden shadow-lg">
+                                            <div key={a.id} className="bg-[#1C1C1E]/90 border border-gray-800 rounded-3xl overflow-hidden shadow-lg">
                                                 <button onClick={() => setExpandedRoutine(expandedRoutine === a.id ? null : a.id)} className="w-full p-5 flex justify-between items-center hover:bg-white/5 transition-colors">
                                                     <div className="text-left">
                                                         <p className="text-white font-black uppercase text-lg italic leading-none">{a.routine?.nombre}</p>
@@ -801,7 +803,7 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
     }, [assignments]);
 
     return (
-        <div className="min-h-screen bg-black flex flex-col p-4 text-left">
+        <div className="flex flex-col p-4 text-left flex-1">
             <EditGroupModal isVisible={editModalVisible} group={selectedGroupToEdit} onClose={() => setEditModalVisible(false)} onUpdate={fetchAssignments} />
             
             <header className="mb-6">
@@ -816,7 +818,7 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
                            <TargetIcon size={44} strokeWidth={2.5} className="mb-4 mx-auto" /><h2 className="text-2xl font-black italic text-white uppercase tracking-tighter">SIN PLANES ASIGNADOS</h2>
                         </div>
                     ) : groupedAssignments.map(group => (
-                        <div key={group.id} className={`rounded-[2rem] border bg-gradient-to-br from-[#1C1C1E] to-[#0A0A0B] overflow-hidden transition-all shadow-xl ${group.is_active ? 'border-[#3ABFBC] shadow-[0_0_20px_rgba(58,191,188,0.1)]' : 'border-gray-800'}`}>
+                        <div key={group.id} className={`rounded-[2rem] border bg-gradient-to-br from-[#1C1C1E]/80 to-[#0A0A0B]/80 backdrop-blur-sm overflow-hidden transition-all shadow-xl ${group.is_active ? 'border-[#3ABFBC] shadow-[0_0_20px_rgba(58,191,188,0.1)]' : 'border-gray-800'}`}>
                             <div onClick={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)} className="p-6 flex justify-between items-center cursor-pointer active:bg-white/5 transition-colors">
                                 <div className="flex-1 min-w-0 pr-4">
                                     <h3 className="text-2xl font-black italic uppercase text-white tracking-tighter leading-none mb-3 truncate">{group.name}</h3>
@@ -854,7 +856,7 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
                             {expandedGroup === group.id && (
                                 <div className="bg-black/40 border-t border-gray-800/50 p-4 space-y-4 animate-in slide-in-from-top-2">
                                     {group.items.map(a => (
-                                        <div key={a.id} className="bg-[#1C1C1E] border border-gray-800 rounded-3xl overflow-hidden shadow-sm">
+                                        <div key={a.id} className="bg-[#1C1C1E]/90 border border-gray-800 rounded-3xl overflow-hidden shadow-sm">
                                             <button onClick={() => setExpandedRoutine(expandedRoutine === a.id ? null : a.id)} className="w-full p-4 flex justify-between items-center hover:bg-white/5 transition-colors">
                                                 <p className="text-[#3ABFBC] font-black uppercase text-lg italic leading-none">{a.routine?.nombre}</p>
                                                 <div className="flex items-center gap-2 text-left">
@@ -950,14 +952,36 @@ const App = () => {
 
     if (authLoading) return <div className="min-h-screen bg-black flex items-center justify-center w-full"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div>;
 
-    switch (currentScreen) {
-        case 'login': return <LoginPage />;
-        case 'dashboard': return isProfessor ? <ProfessorDashboard navigate={navigate} /> : <StudentDashboard navigate={navigate} />;
-        case 'addStudent': return <AddStudentPage navigate={navigate} />;
-        case 'createRoutineGroup': return <RoutineGroupPage navigate={navigate} studentId={temp.studentId} studentName={temp.studentName} />;
-        case 'viewRoutine': return <StudentRoutineView navigate={navigate} studentId={temp.studentId} studentName={temp.studentName} />;
-        default: return <LoginPage />;
-    }
+    const renderScreen = () => {
+        switch (currentScreen) {
+            case 'login': return <LoginPage />;
+            case 'dashboard': return isProfessor ? <ProfessorDashboard navigate={navigate} /> : <StudentDashboard navigate={navigate} />;
+            case 'addStudent': return <AddStudentPage navigate={navigate} />;
+            case 'createRoutineGroup': return <RoutineGroupPage navigate={navigate} studentId={temp.studentId} studentName={temp.studentName} />;
+            case 'viewRoutine': return <StudentRoutineView navigate={navigate} studentId={temp.studentId} studentName={temp.studentName} />;
+            default: return <LoginPage />;
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-black relative flex flex-col">
+            {/* FONDO GLOBAL CON IMAGEN Y GRADIENTE OSCURO */}
+            {currentScreen !== 'login' && (
+                <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+                    <img 
+                        src={BG_IMAGE_URL} 
+                        className="w-full h-full object-cover opacity-20 grayscale" 
+                        alt="Global Background" 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black via-black/60 to-black" />
+                </div>
+            )}
+            
+            <div className="relative z-10 flex flex-col min-h-screen">
+                {renderScreen()}
+            </div>
+        </div>
+    );
 };
 
 const AddStudentPage = ({ navigate }) => {
@@ -974,7 +998,7 @@ const AddStudentPage = ({ navigate }) => {
     };
 
     return (
-        <div className="min-h-screen bg-black p-6 flex flex-col items-center">
+        <div className="p-6 flex flex-col items-center flex-1">
             <header className="mb-10 max-w-lg w-full text-left">
                 <button onClick={() => navigate('dashboard')} className="text-[#3ABFBC] flex items-center gap-2 font-black italic uppercase tracking-tighter mb-8 text-sm group hover:translate-x-[-4px] transition-transform"><ArrowLeft size={18} strokeWidth={2.5}/> VOLVER</button>
                 <h1 className="text-4xl font-black italic text-white tracking-tighter uppercase leading-none text-left">ALTA ALUMNO</h1>
@@ -1024,7 +1048,7 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
     };
 
     return (
-        <div className="min-h-screen bg-black flex flex-col p-4 text-left">
+        <div className="flex flex-col p-4 text-left flex-1">
             <ExerciseSelectorModal isVisible={isSelectorOpen} onClose={() => setIsSelectorOpen(false)} existingExercises={availableExercises} onAddExercise={(ex) => { const next = [...routines]; next[currentDayIdx].exercises.push({...ex, sets: 3, repetitions: "10", peso: "0", notas: '', order: next[currentDayIdx].exercises.length + 1}); setRoutines(next); }} />
             <header className="mb-6 max-w-2xl mx-auto w-full text-left">
                 <button onClick={() => step > 1 ? setStep(step - 1) : navigate('dashboard')} className="text-[#3ABFBC] flex items-center gap-2 font-black italic uppercase tracking-tighter mb-4 text-xs group hover:translate-x-[-4px] transition-transform"><ArrowLeft size={18} strokeWidth={2.5}/> VOLVER</button>
@@ -1036,7 +1060,7 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
                     <div className="space-y-4 text-left">
                         <Input placeholder="NOMBRE DEL PLAN" value={groupData.name} onChange={e => setGroupData({...groupData, name: e.target.value})} Icon={Zap} />
                         <Input type="date" value={groupData.due_date} onChange={e => setGroupData({...groupData, due_date: e.target.value})} Icon={Calendar} />
-                        <div className="bg-gradient-to-br from-[#1C1C1E] to-black p-10 rounded-[2.5rem] border border-gray-800 text-center shadow-2xl mt-6">
+                        <div className="bg-gradient-to-br from-[#1C1C1E]/80 to-black/80 backdrop-blur-sm p-10 rounded-[2.5rem] border border-gray-800 text-center shadow-2xl mt-6">
                             <p className="text-[#A9A9A9] font-black uppercase text-[10px] tracking-widest mb-8 opacity-60 italic">Variantes de Día / Bloques</p>
                             <div className="flex justify-center items-center gap-10">
                                 <button onClick={() => updateDaysCount(Math.max(1, groupData.days - 1))} className="w-14 h-14 bg-gray-600 border border-gray-500 text-white rounded-2xl flex items-center justify-center disabled:opacity-20 active:scale-90 shadow-lg" disabled={groupData.days <= 1}><Minus strokeWidth={2.5}/></button>
@@ -1049,11 +1073,11 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
                 ) : (
                     <div className="space-y-8 text-left">
                         {routines.map((day, dIdx) => (
-                            <div key={dIdx} className="bg-gradient-to-b from-[#1C1C1E] to-black p-6 rounded-[2.5rem] border-l-8 border-[#3ABFBC] shadow-2xl overflow-hidden relative">
+                            <div key={dIdx} className="bg-gradient-to-b from-[#1C1C1E]/80 to-black/80 backdrop-blur-sm p-6 rounded-[2.5rem] border-l-8 border-[#3ABFBC] shadow-2xl overflow-hidden relative">
                                 <input placeholder="Nombre" value={day.nombre} onChange={e => {const n = [...routines]; n[dIdx].nombre = e.target.value; setRoutines(n);}} className="bg-transparent text-[#3ABFBC] font-black uppercase text-2xl outline-none w-full italic border-b border-gray-800 pb-4 mb-4 text-left" />
                                 <div className="mb-6">
                                     <label className="text-[10px] font-black text-[#A9A9A9] uppercase ml-2 mb-2 block tracking-widest">Objetivo del día</label>
-                                    <div className="flex items-start gap-3 bg-black border border-gray-800 rounded-2xl p-4 focus-within:border-[#3ABFBC] transition-all shadow-inner">
+                                    <div className="flex items-start gap-3 bg-black/50 border border-gray-800 rounded-2xl p-4 focus-within:border-[#3ABFBC] transition-all shadow-inner">
                                         <AlignLeft size={16} className="text-gray-500 mt-1" />
                                         <textarea value={day.descripcion} onChange={e => {const n = [...routines]; n[dIdx].descripcion = e.target.value; setRoutines(n);}} placeholder="EJ: ENFOQUE EN FUERZA..." rows={1} className="flex-1 bg-transparent text-[13px] text-white font-bold outline-none resize-none placeholder:opacity-50 uppercase italic" />
                                     </div>
