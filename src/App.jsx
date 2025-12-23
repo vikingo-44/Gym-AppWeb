@@ -793,7 +793,7 @@ const App = () => {
             appleIcon.href = LOGO_URL;
 
             // Meta tags para que se vea como App
-            document.title = "Peakfit";
+            document.title = "ND Training";
             const metaTheme = document.querySelector('meta[name="theme-color"]') || document.createElement('meta');
             metaTheme.name = "theme-color";
             metaTheme.content = "#000000";
