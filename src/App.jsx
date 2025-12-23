@@ -748,7 +748,7 @@ const App = () => {
             let appleIcon = document.querySelector("link[rel~='apple-touch-icon']");
             if (!appleIcon) { appleIcon = document.createElement('link'); appleIcon.rel = 'apple-touch-icon'; document.head.appendChild(appleIcon); }
             appleIcon.href = LOGO_URL;
-            document.title = "Peakfit";
+            document.title = "ND Training";
             
             // CONFIGURACIÓN PARA EVITAR ZOOM Y COMPORTARSE COMO APP
             let metaViewport = document.querySelector('meta[name="viewport"]');
