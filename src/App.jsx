@@ -6,7 +6,7 @@ import {
     RefreshCcw, Key, Save, PlusCircle, Trash2, Zap, Calendar, List,
     Dumbbell, Filter, Minus, Info, ShieldCheck, AlertCircle, PlusSquare, Settings, History,
     Check, XCircle as XIcon, ChevronDown, ChevronUp, ClipboardList, Target, Sparkles, Layout,
-    MessageSquare, AlignLeft, Edit3, Target as TargetIcon, ChevronLeft
+    MessageSquare, AlignLeft, Edit3, Target as TargetIcon, ChevronLeft, Fingerprint
 } from 'lucide-react';
 
 // ----------------------------------------------------------------------
@@ -37,7 +37,6 @@ const formatTimestamp = (isoString) => {
     });
 };
 
-// Utilidad para generar clave aleatoria
 const generateRandomPassword = () => {
     return Math.random().toString(36).slice(-8);
 };
@@ -124,7 +123,7 @@ const Input = ({ placeholder, value, onChange, type = 'text', Icon, isPassword =
             <div className="flex items-center rounded-2xl h-14 px-4 border border-gray-800 bg-[#1C1C1E] focus-within:border-[#3ABFBC] transition-all shadow-inner">
                 {Icon && <Icon size={18} className="text-[#A9A9A9] mr-3" />}
                 <input
-                    className="flex-1 bg-transparent text-white text-[16px] font-medium outline-none placeholder:text-gray-600"
+                    className="flex-1 bg-transparent text-white text-[16px] font-medium outline-none placeholder:text-gray-600 w-full"
                     style={{ colorScheme: 'dark' }} 
                     placeholder={placeholder}
                     value={value || ''}
@@ -166,6 +165,66 @@ const Notification = ({ msg, type, onClose }) => {
 // ----------------------------------------------------------------------
 // 4. MODALES
 // ----------------------------------------------------------------------
+
+const PublicResetPasswordModal = ({ isVisible, onClose }) => {
+    const { API_URL } = useAuth();
+    const [dni, setDni] = useState('');
+    const [newPass, setNewPass] = useState('');
+    const [confirm, setConfirm] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [msg, setMsg] = useState({ text: '', type: '' });
+
+    useEffect(() => {
+        if (isVisible) { setDni(''); setNewPass(''); setConfirm(''); setMsg({ text: '', type: '' }); }
+    }, [isVisible]);
+
+    if (!isVisible) return null;
+
+    const handleReset = async () => {
+        if (!dni || !newPass || !confirm) return setMsg({ text: "COMPLETA TODOS LOS CAMPOS", type: "error" });
+        if (newPass !== confirm) return setMsg({ text: "LAS CLAVES NO COINCIDEN", type: "error" });
+        if (newPass.length < 6) return setMsg({ text: "MÍNIMO 6 CARACTERES", type: "error" });
+
+        setLoading(true); setMsg({ text: '', type: '' });
+        try {
+            await axios.patch(`${API_URL}/users/student/reset-password/${dni}`, { password: newPass });
+            setMsg({ text: "CLAVE CAMBIADA CON ÉXITO", type: "success" });
+            setTimeout(() => onClose(), 2000);
+        } catch (e) {
+            const errorMsg = e.response?.data?.detail || "ERROR: DNI NO ENCONTRADO";
+            setMsg({ text: errorMsg.toString().toUpperCase(), type: "error" });
+        } finally { setLoading(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[250] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
+            <div className="bg-[#1C1C1E] w-full max-w-sm rounded-[2.5rem] border border-gray-800 p-8 shadow-2xl text-left">
+                <div className="text-center mb-6">
+                    <Fingerprint size={40} strokeWidth={2.5} className="text-[#3ABFBC] mx-auto mb-2" />
+                    <h2 className="text-xl font-black italic text-white uppercase tracking-tighter">RECUPERAR ACCESO</h2>
+                    <p className="text-[9px] text-[#A9A9A9] font-black uppercase tracking-widest mt-1 italic">INGRESA TU DNI Y NUEVA CLAVE</p>
+                </div>
+                {msg.text && <div className={`mb-4 p-3 rounded-xl text-[10px] font-black text-center uppercase tracking-widest ${msg.type === 'error' ? 'bg-red-900/40 text-red-500 border border-red-500/50' : 'bg-[#3ABFBC]/20 text-[#3ABFBC] border border-[#3ABFBC]/50'}`}>{msg.text}</div>}
+                
+                <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-1 block tracking-widest">Tu DNI</label>
+                    <Input placeholder="DNI SIN PUNTOS" Icon={CreditCard} value={dni} onChange={e => setDni(e.target.value)} />
+                    
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mt-4 mb-1 block tracking-widest">Nueva Contraseña</label>
+                    <Input placeholder="NUEVA CLAVE" Icon={Lock} value={newPass} onChange={e => setNewPass(e.target.value)} isPassword />
+                    <Input placeholder="CONFIRMAR CLAVE" Icon={CheckCircle} value={confirm} onChange={e => setConfirm(e.target.value)} isPassword />
+                </div>
+
+                <div className="flex gap-3 mt-8">
+                    <button onClick={onClose} className="flex-1 bg-gray-800 h-14 rounded-2xl text-white font-bold uppercase text-[10px] tracking-widest">CANCELAR</button>
+                    <button onClick={handleReset} disabled={loading} className="flex-1 bg-[#3ABFBC] text-black h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest italic flex items-center justify-center shadow-lg active:scale-95 transition-all">
+                        {loading ? <Loader2 className="animate-spin" /> : "CAMBIAR CLAVE"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
     const { authToken, API_URL } = useAuth();
@@ -229,7 +288,6 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                     <h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter">AJUSTAR PLAN</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={32}/></button>
                 </div>
-
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -241,9 +299,8 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                             <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} Icon={Calendar} />
                         </div>
                     </div>
-
                     <div className="space-y-4">
-                        <p className="text-[#3ABFBC] font-black uppercase text-[10px] tracking-widest border-b border-gray-800 pb-2 italic">Contenido del Entrenamiento</p>
+                        <p className="text-[#3ABFBC] font-black uppercase text-[10px] tracking-widest border-b border-gray-800 pb-2 italic text-left">Contenido del Entrenamiento</p>
                         {routines.map((r, rIdx) => (
                             <div key={r.id} className="bg-black/40 border border-gray-800 rounded-2xl overflow-hidden">
                                 <button onClick={() => setExpandedIdx(expandedIdx === rIdx ? null : rIdx)} className="w-full p-4 flex justify-between items-center hover:bg-white/5 transition-colors">
@@ -251,7 +308,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                     {expandedIdx === rIdx ? <ChevronUp size={18} className="text-[#3ABFBC]"/> : <ChevronDown size={18} className="text-gray-500"/>}
                                 </button>
                                 {expandedIdx === rIdx && (
-                                    <div className="p-4 space-y-4 border-t border-gray-800/50">
+                                    <div className="p-4 space-y-4 border-t border-gray-800/50 text-left">
                                         <div className="bg-black border border-gray-800 rounded-xl p-3">
                                             <label className="text-[8px] font-black text-[#A9A9A9] uppercase mb-1 block">Objetivo / Descripción del Día</label>
                                             <textarea 
@@ -264,7 +321,6 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                                 className="w-full bg-transparent text-white font-bold italic text-[12px] outline-none resize-none h-12 uppercase" 
                                             />
                                         </div>
-
                                         {r.exercises.map((ex, eIdx) => (
                                             <div key={eIdx} className="bg-[#1C1C1E] p-4 rounded-xl border border-gray-800 shadow-inner">
                                                 <p className="text-[#3ABFBC] font-black uppercase text-[11px] mb-3 italic">{ex.exercise.nombre}</p>
@@ -278,7 +334,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                                             day.exercises[eIdx] = { ...day.exercises[eIdx], sets: e.target.value };
                                                             n[rIdx] = day;
                                                             setRoutines(n);
-                                                        }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs" />
+                                                        }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs text-center" />
                                                     </div>
                                                     <div>
                                                         <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block">Reps</label>
@@ -289,7 +345,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                                             day.exercises[eIdx] = { ...day.exercises[eIdx], repetitions: e.target.value };
                                                             n[rIdx] = day;
                                                             setRoutines(n);
-                                                        }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs" />
+                                                        }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs text-center" />
                                                     </div>
                                                     <div>
                                                         <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block">Peso</label>
@@ -300,7 +356,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                                             day.exercises[eIdx] = { ...day.exercises[eIdx], peso: e.target.value };
                                                             n[rIdx] = day;
                                                             setRoutines(n);
-                                                        }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs" />
+                                                        }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs text-center" />
                                                     </div>
                                                 </div>
                                                 <textarea value={ex.notas || ""} onChange={e => {
@@ -319,7 +375,6 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                         ))}
                     </div>
                 </div>
-
                 <div className="mt-10 flex gap-4">
                     <button onClick={onClose} className="flex-1 h-16 bg-gray-800 rounded-2xl text-white font-black uppercase text-xs tracking-widest active:scale-95 transition-all">CANCELAR</button>
                     <button onClick={handleSave} disabled={loading} className="flex-1 h-16 bg-[#3ABFBC] text-black font-black uppercase italic rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center">
@@ -364,11 +419,11 @@ const StudentInfoModal = ({ isVisible, onClose, student, onUpdate }) => {
 
     return (
         <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-[#1C1C1E] w-full max-sm:w-[95%] max-w-sm rounded-[2rem] border border-gray-800 p-8 shadow-2xl relative">
+            <div className="bg-[#1C1C1E] w-full max-sm:w-[95%] max-w-sm rounded-[2rem] border border-gray-800 p-8 shadow-2xl relative text-left">
                 <button onClick={onClose} className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors"><X size={24}/></button>
                 <div className="text-center mb-6"><h2 className="text-2xl font-black italic text-white uppercase tracking-tighter">DATOS DEL ALUMNO</h2></div>
                 {msg.text && <div className={`mb-4 p-3 rounded-xl text-[10px] font-black text-center uppercase tracking-widest ${msg.type === 'error' ? 'bg-red-900/40 text-red-500 border border-red-500/50' : 'bg-[#3ABFBC]/20 text-[#3ABFBC] border border-[#3ABFBC]/50'}`}>{msg.text}</div>}
-                <div className="space-y-1 text-left">
+                <div className="space-y-1">
                     <label className="text-[11px] font-black text-[#A9A9A9] uppercase ml-2 mb-1 block tracking-widest">Nombre Completo</label>
                     <Input placeholder="NOMBRE" Icon={User} value={editData.nombre} onChange={e => setEditData({...editData, nombre: e.target.value})} />
                     <label className="text-[11px] font-black text-[#A9A9A9] uppercase ml-2 mb-1 block tracking-widest">Email</label>
@@ -429,7 +484,7 @@ const ResetPasswordModal = ({ isVisible, onClose, targetUser, mode = 'profile' }
                 <div className="text-center mb-6">
                     <Key size={32} strokeWidth={2.5} className="text-amber-500 mx-auto mb-2" />
                     <h2 className="text-xl font-black italic text-white uppercase tracking-tighter">SEGURIDAD</h2>
-                    <p className="text-[10px] text-[#A9A9A9] font-black uppercase tracking-widest mt-1.5 italic text-center">CAMBIAR CONTRASEÑA</p>
+                    <p className="text-[10px] text-[#A9A9A9] font-black uppercase tracking-widest mt-1.5 italic">CAMBIAR CONTRASEÑA</p>
                 </div>
                 {msg.text && <div className={`mb-4 p-3 rounded-xl text-[10px] font-black text-center uppercase tracking-widest ${msg.type === 'error' ? 'bg-red-900/40 text-red-500 border border-red-500/50' : 'bg-[#3ABFBC]/20 text-[#3ABFBC] border border-[#3ABFBC]/50'}`}>{msg.text}</div>}
                 <div className="space-y-1">
@@ -440,7 +495,7 @@ const ResetPasswordModal = ({ isVisible, onClose, targetUser, mode = 'profile' }
                     <Input placeholder="REPETIR CLAVE" Icon={CheckCircle} value={confirm} onChange={e => setConfirm(e.target.value)} isPassword />
                 </div>
                 <div className="flex gap-3 mt-6">
-                    <button onClick={onClose} className="flex-1 bg-gray-800 h-14 rounded-2xl text-white font-bold uppercase text-[10px] tracking-widest transition-all active:bg-gray-700">CANCELAR</button>
+                    <button onClick={onClose} className="flex-1 bg-gray-800 h-14 rounded-2xl text-white font-bold uppercase text-[10px] tracking-widest transition-all">CANCELAR</button>
                     <button onClick={handleUpdate} disabled={loading} className="flex-1 bg-[#3ABFBC] text-black h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest italic flex items-center justify-center shadow-lg active:scale-95 transition-all">
                         {loading ? <Loader2 className="animate-spin" /> : "ACTUALIZAR"}
                     </button>
@@ -456,7 +511,7 @@ const ConfirmResetModal = ({ isVisible, student, password, onConfirm, onClose, l
         <div className="fixed inset-0 z-[250] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl text-center">
             <div className="bg-[#1C1C1E] w-full max-w-sm rounded-[2.5rem] border border-gray-800 p-10 shadow-2xl animate-in zoom-in duration-300">
                 <div className="bg-red-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20"><AlertCircle size={40} className="text-red-500" /></div>
-                <h2 className="text-2xl font-black italic text-white uppercase tracking-tighter mb-4">¿RESET DE CLAVE?</h2>
+                <h2 className="text-2xl font-black italic text-white uppercase tracking-tighter mb-4 text-center">¿RESET DE CLAVE?</h2>
                 <div className="bg-black/50 p-6 rounded-3xl border border-gray-800 mb-8">
                     <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest italic mb-3">NUEVA CLAVE GENERADA</p>
                     <p className="text-3xl font-black text-[#3ABFBC] tracking-widest tabular-nums">{password}</p>
@@ -480,6 +535,7 @@ const LoginPage = () => {
     const [pass, setPass] = useState('');
     const [load, setLoad] = useState(false);
     const [err, setErr] = useState('');
+    const [showPublicReset, setShowPublicReset] = useState(false);
 
     const handleLogin = async () => {
         if(!dni || !pass) return setErr("Completa todos los campos.");
@@ -493,6 +549,8 @@ const LoginPage = () => {
 
     return (
         <div className="min-h-screen bg-black flex items-center justify-center p-8 relative overflow-hidden text-center">
+            <PublicResetPasswordModal isVisible={showPublicReset} onClose={() => setShowPublicReset(false)} />
+            
             <div className="absolute inset-0 z-0">
                 <img src={BG_IMAGE_URL} className="w-full h-full object-cover opacity-50 grayscale" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black" />
@@ -503,8 +561,13 @@ const LoginPage = () => {
                 {err && <div className="bg-red-600 border border-red-400 text-white p-3.5 rounded-2xl text-center mb-4 font-bold text-[10px] uppercase w-full tracking-widest">{err}</div>}
                 <Input placeholder="DNI O EMAIL" Icon={User} value={dni} onChange={e => setDni(e.target.value)} />
                 <Input placeholder="CONTRASEÑA" Icon={Lock} isPassword value={pass} onChange={e => setPass(e.target.value)} />
+                
                 <button onClick={handleLogin} disabled={load} className="w-full bg-[#3ABFBC] h-16 rounded-[1.5rem] font-black text-lg text-black mt-6 shadow-xl active:scale-95 transition-all italic uppercase flex items-center justify-center">
                     {load ? <Loader2 className="animate-spin" /> : "INICIAR SESIÓN"}
+                </button>
+
+                <button onClick={() => setShowPublicReset(true)} className="mt-8 text-[11px] font-black uppercase text-[#3ABFBC] italic tracking-widest opacity-70 hover:opacity-100 transition-opacity flex items-center gap-2">
+                    <Fingerprint size={16}/> OLVIDÉ MI CONTRASEÑA
                 </button>
             </div>
         </div>
@@ -525,7 +588,6 @@ const ProfessorDashboard = ({ navigate }) => {
     const [toast, setToast] = useState({ msg: '', type: '' });
     const [resetConfirm, setResetConfirm] = useState({ visible: false, student: null, password: '', loading: false });
 
-    // ESTADO DE PAGINACIÓN
     const [currentPage, setCurrentPage] = useState(1);
     const studentsPerPage = 20;
 
@@ -539,7 +601,6 @@ const ProfessorDashboard = ({ navigate }) => {
 
     useEffect(() => { refresh(); }, [refresh]);
 
-    // Función para abrir el reset con clave aleatoria
     const openResetConfirm = (student) => {
         const newPass = generateRandomPassword();
         setResetConfirm({ visible: true, student, password: newPass, loading: false });
@@ -559,17 +620,14 @@ const ProfessorDashboard = ({ navigate }) => {
         }
     };
 
-    // FILTRADO Y ORDENAMIENTO
     const filtered = (students || [])
         .filter(s => (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || (s.dni || "").toString().includes(search))
         .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
 
-    // LÓGICA DE PAGINACIÓN
     const totalPages = Math.ceil(filtered.length / studentsPerPage);
     const startIndex = (currentPage - 1) * studentsPerPage;
     const paginatedStudents = filtered.slice(startIndex, startIndex + studentsPerPage);
 
-    // Volver a la página 1 cuando se busca algo nuevo
     useEffect(() => {
         setCurrentPage(1);
     }, [search]);
@@ -581,31 +639,29 @@ const ProfessorDashboard = ({ navigate }) => {
             <StudentInfoModal isVisible={showInfo} onClose={() => setShowInfo(false)} student={selectedStudent} onUpdate={refresh} />
             <ResetPasswordModal isVisible={showProfile} onClose={() => setShowProfile(false)} targetUser={userData} mode="profile" />
 
-            <header className="p-4 bg-[#1C1C1E]/80 backdrop-blur-md border-b border-gray-800 flex justify-between items-center sticky top-0 z-50 gap-2">
+            <header className="p-4 bg-[#1C1C1E]/80 backdrop-blur-md border-b border-gray-800 flex justify-between items-center sticky top-0 z-50 gap-2 text-left">
                 <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                     <img src={LOGO_URL} className="w-10 h-10 sm:w-14 sm:h-14 object-contain shrink-0" />
                     <div className="text-left min-w-0">
-                        <h2 className="text-[#3ABFBC] font-black text-sm sm:text-xl italic uppercase tracking-tighter leading-none truncate">HOLA, {userData?.nombre?.split(' ')[0]}</h2>
-                        <p className="text-[7px] sm:text-[8px] font-black text-[#A9A9A9] uppercase tracking-widest mt-1 italic">VAMOS POR TODO</p>
+                        <h2 className="text-[#3ABFBC] font-black text-sm sm:text-xl italic uppercase tracking-tighter leading-none truncate text-left">HOLA, {userData?.nombre?.split(' ')[0]}</h2>
+                        <p className="text-[7px] sm:text-[8px] font-black text-[#A9A9A9] uppercase tracking-widest mt-1 italic text-left leading-none">VAMOS POR TODO</p>
                     </div>
                 </div>
                 <div className="flex gap-1.5 sm:gap-2 shrink-0">
-                    <button onClick={refresh} className="w-9 h-9 sm:w-10 sm:h-10 bg-gray-600 border border-gray-500 rounded-xl flex items-center justify-center text-white active:scale-95 transition-all shadow-lg"><RefreshCcw size={18}/></button>
-                    <button onClick={() => setShowProfile(true)} className="w-9 h-9 sm:w-10 sm:h-10 bg-amber-500 rounded-xl flex items-center justify-center text-black active:scale-95 transition-all shadow-lg"><Key size={18}/></button>
+                    <button onClick={refresh} className="w-9 h-9 sm:w-10 sm:h-10 bg-gray-600 border border-gray-500 rounded-xl flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"><RefreshCcw size={18}/></button>
+                    <button onClick={() => setShowProfile(true)} className="w-9 h-9 sm:w-10 sm:h-10 bg-amber-500 rounded-xl flex items-center justify-center text-black shadow-lg active:scale-95 transition-all"><Key size={18}/></button>
                     <button onClick={() => navigate('addStudent')} className="w-9 h-9 sm:w-10 sm:h-10 bg-[#3ABFBC] rounded-xl flex items-center justify-center text-black shadow-lg hover:scale-105 active:scale-95 transition-all"><UserPlus size={18}/></button>
-                    <button onClick={signOut} className="w-9 h-9 sm:w-10 sm:h-10 bg-red-600 rounded-xl flex items-center justify-center text-white active:scale-95 transition-all shadow-lg"><LogOut size={18}/></button>
+                    <button onClick={signOut} className="w-9 h-9 sm:w-10 sm:h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"><LogOut size={18}/></button>
                 </div>
             </header>
 
             <main className="p-4 flex-1">
-                {/* CONTENEDOR DE BÚSQUEDA Y PAGINACIÓN ARRIBA */}
                 <div className="max-w-2xl mx-auto flex flex-col md:flex-row items-center gap-4 mb-8">
                     <div className="relative flex-1 w-full">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
                         <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
                     </div>
 
-                    {/* PAGINACIÓN COMPACTA ARRIBA */}
                     {totalPages > 1 && (
                         <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
                             <button 
@@ -615,12 +671,10 @@ const ProfessorDashboard = ({ navigate }) => {
                             >
                                 <ChevronLeft size={20} />
                             </button>
-                            
-                            <div className="px-2 text-center">
+                            <div className="px-2 text-center min-w-[60px]">
                                 <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block leading-none mb-1">Página</span>
                                 <span className="text-white font-black italic text-sm tabular-nums">{currentPage} / {totalPages}</span>
                             </div>
-
                             <button 
                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                 disabled={currentPage === totalPages}
@@ -633,42 +687,39 @@ const ProfessorDashboard = ({ navigate }) => {
                 </div>
 
                 {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
-                    <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-16">
-                            {paginatedStudents.map(s => (
-                                <div key={s.id} className="bg-[#1C1C1E]/80 backdrop-blur-sm rounded-3xl p-5 border border-gray-800 shadow-2xl group transition-all relative overflow-hidden min-h-[160px]">
-                                    <div className="absolute -right-4 -bottom-4 pointer-events-none z-0">
-                                        <Dumbbell 
-                                            className="text-white opacity-[0.04] w-28 h-28 -rotate-12 group-hover:scale-110 transition-transform duration-700" 
-                                            strokeWidth={3}
-                                        />
-                                    </div>
-                                    
-                                    <div className="flex items-center mb-6 relative z-10">
-                                        <div className="w-12 h-12 rounded-2xl bg-[#3ABFBC] flex items-center justify-center mr-4 shadow-lg group-hover:scale-110 transition-transform"><User size={24} color="black" /></div>
-                                        <div className="min-w-0 flex-1 overflow-hidden">
-                                            <h3 className="text-sm font-black italic text-white uppercase truncate">{s.nombre}</h3>
-                                            <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate">{s.email}</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-4 gap-2 relative z-10">
-                                        <button onClick={() => { setSelectedStudent(s); setShowInfo(true); }} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
-                                            <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><Info size={16} strokeWidth={2.5}/> Info</span>
-                                        </button>
-                                        <button onClick={() => openResetConfirm(s)} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-amber-500 hover:bg-amber-500 hover:text-black hover:border-amber-500 active:scale-95 transition-all duration-200 shadow-sm">
-                                            <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><Key size={16} strokeWidth={2.5}/> Reset</span>
-                                        </button>
-                                        <button onClick={() => navigate('viewRoutine', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
-                                            <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><History size={16} strokeWidth={2.5}/> Histo</span>
-                                        </button>
-                                        <button onClick={() => navigate('createRoutineGroup', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-[#3ABFBC] hover:bg-[#3ABFBC] hover:text-black hover:border-[#3ABFBC] active:scale-95 transition-all duration-200 shadow-sm">
-                                            <span className="text-[7px] font-black mt-1 uppercase italic text-center flex flex-col items-center"><Dumbbell size={16} strokeWidth={2.5}/> Nueva</span>
-                                        </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-16">
+                        {paginatedStudents.map(s => (
+                            <div key={s.id} className="bg-[#1C1C1E]/80 backdrop-blur-sm rounded-3xl p-5 border border-gray-800 shadow-2xl group transition-all relative overflow-hidden min-h-[160px] text-left">
+                                <div className="absolute -right-4 -bottom-4 pointer-events-none z-0">
+                                    <Dumbbell 
+                                        className="text-white opacity-[0.04] w-28 h-28 -rotate-12 group-hover:scale-110 transition-transform duration-700" 
+                                        strokeWidth={3}
+                                    />
+                                </div>
+                                <div className="flex items-center mb-6 relative z-10">
+                                    <div className="w-12 h-12 rounded-2xl bg-[#3ABFBC] flex items-center justify-center mr-4 shadow-lg shrink-0"><User size={24} color="black" /></div>
+                                    <div className="min-w-0 flex-1 overflow-hidden">
+                                        <h3 className="text-sm font-black italic text-white uppercase truncate text-left">{s.nombre}</h3>
+                                        <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate text-left">{s.email}</p>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    </>
+                                <div className="grid grid-cols-4 gap-2 relative z-10">
+                                    <button onClick={() => { setSelectedStudent(s); setShowInfo(true); }} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black active:scale-95 transition-all shadow-sm">
+                                        <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><Info size={16} strokeWidth={2.5}/> Info</span>
+                                    </button>
+                                    <button onClick={() => openResetConfirm(s)} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-amber-500 hover:bg-amber-500 hover:text-black active:scale-95 transition-all shadow-sm">
+                                        <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><Key size={16} strokeWidth={2.5}/> Reset</span>
+                                    </button>
+                                    <button onClick={() => navigate('viewRoutine', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black active:scale-95 transition-all shadow-sm">
+                                        <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><History size={16} strokeWidth={2.5}/> Histo</span>
+                                    </button>
+                                    <button onClick={() => navigate('createRoutineGroup', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-[#3ABFBC] hover:bg-[#3ABFBC] hover:text-black active:scale-95 transition-all shadow-sm">
+                                        <span className="text-[7px] font-black mt-1 uppercase italic text-center flex flex-col items-center"><Dumbbell size={16} strokeWidth={2.5}/> Nueva</span>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 )}
             </main>
         </div>
@@ -717,22 +768,22 @@ const StudentDashboard = ({ navigate }) => {
         <div className="flex flex-col text-left flex-1">
             <ResetPasswordModal isVisible={showProfile} onClose={() => setShowProfile(false)} targetUser={userData} mode="profile" />
             
-            <header className="p-4 bg-[#1C1C1E]/80 backdrop-blur-md border-b border-gray-800 flex justify-between items-center sticky top-0 z-50 text-left gap-2">
-                <div className="flex items-center gap-2 sm:gap-4 min-w-0 text-left">
+            <header className="p-4 bg-[#1C1C1E]/80 backdrop-blur-md border-b border-gray-800 flex justify-between items-center sticky top-0 z-50 gap-2 text-left">
+                <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                     <img src={LOGO_URL} className="w-10 h-10 sm:w-14 sm:h-14 object-contain shrink-0" />
                     <div className="text-left min-w-0">
-                        <h2 className="text-[#3ABFBC] font-black text-sm sm:text-xl italic uppercase tracking-tighter leading-none truncate">HOLA, {userData?.nombre?.split(' ')[0]}</h2>
-                        <p className="text-[7px] sm:text-[8px] font-black text-[#A9A9A9] uppercase tracking-widest mt-1 italic leading-none">MI ENTRENAMIENTO</p>
+                        <h2 className="text-[#3ABFBC] font-black text-sm sm:text-xl italic uppercase tracking-tighter leading-none truncate text-left">HOLA, {userData?.nombre?.split(' ')[0]}</h2>
+                        <p className="text-[7px] sm:text-[8px] font-black text-[#A9A9A9] uppercase tracking-widest mt-1 italic text-left leading-none">MI ENTRENAMIENTO</p>
                     </div>
                 </div>
-                <div className="flex gap-1.5 sm:gap-2 shrink-0 text-center">
-                    <button onClick={() => setShowProfile(true)} className="w-9 h-9 sm:w-10 sm:h-10 bg-amber-500 rounded-xl flex items-center justify-center text-black active:scale-95 transition-all shadow-lg"><Key size={18}/></button>
-                    <button onClick={signOut} className="w-9 h-9 sm:w-10 sm:h-10 bg-red-600 rounded-xl flex items-center justify-center text-white active:scale-95 transition-all shadow-lg"><LogOut size={18}/></button>
+                <div className="flex gap-1.5 sm:gap-2 shrink-0">
+                    <button onClick={() => setShowProfile(true)} className="w-9 h-9 sm:w-10 sm:h-10 bg-amber-500 rounded-xl flex items-center justify-center text-black shadow-lg active:scale-95 transition-all"><Key size={18}/></button>
+                    <button onClick={signOut} className="w-9 h-9 sm:w-10 sm:h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"><LogOut size={18}/></button>
                 </div>
             </header>
 
             <main className="p-4 flex-1">
-                <h3 className="text-white font-black italic uppercase tracking-tighter text-xl mb-6 border-l-4 border-[#3ABFBC] pl-3">MI PLAN DE ENTRENAMIENTO</h3>
+                <h3 className="text-white font-black italic uppercase tracking-tighter text-xl mb-6 border-l-4 border-[#3ABFBC] pl-3 text-left">MI PLAN DE ENTRENAMIENTO</h3>
                 
                 {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
                     <div className="space-y-4 pb-16">
@@ -745,29 +796,22 @@ const StudentDashboard = ({ navigate }) => {
                             <div key={group.id} className="rounded-[2rem] border border-[#3ABFBC]/20 bg-gradient-to-b from-[#1C1C1E]/80 to-black/80 backdrop-blur-sm overflow-hidden shadow-2xl">
                                 <div onClick={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)} className="p-6 flex justify-between items-center cursor-pointer active:bg-white/5 transition-colors">
                                     <div className="flex-1 min-w-0 pr-4 text-left">
-                                        <h3 className="text-2xl font-black italic uppercase text-[#3ABFBC] tracking-tighter leading-none mb-3 truncate">{group.name}</h3>
-                                        <div className="space-y-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <Calendar size={14} className="text-[#3ABFBC]"/><p className="text-[12px] text-white font-black uppercase italic leading-none">VENCE: {formatDisplayDate(group.due_date)}</p>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <User size={14} className="text-amber-500"/><p className="text-[12px] text-[#A9A9A9] font-black uppercase italic leading-none">{group.professor_name}</p>
-                                            </div>
+                                        <h3 className="text-2xl font-black italic uppercase text-[#3ABFBC] tracking-tighter leading-none mb-3 truncate text-left">{group.name}</h3>
+                                        <div className="space-y-1.5 text-left">
+                                            <div className="flex items-center gap-2"><Calendar size={14} className="text-[#3ABFBC]"/><p className="text-[12px] text-white font-black uppercase italic leading-none">VENCE: {formatDisplayDate(group.due_date)}</p></div>
+                                            <div className="flex items-center gap-2"><User size={14} className="text-amber-500"/><p className="text-[12px] text-[#A9A9A9] font-black uppercase italic leading-none">{group.professor_name}</p></div>
                                         </div>
                                     </div>
                                     <div className="bg-white/10 w-12 h-12 rounded-2xl flex items-center justify-center border border-gray-700 shadow-inner">
                                         {expandedGroup === group.id ? <ChevronUp size={24} strokeWidth={2.5} className="text-[#3ABFBC]"/> : <ChevronDown size={24} strokeWidth={2.5} className="text-[#A9A9A9]"/>}
                                     </div>
                                 </div>
-
                                 {expandedGroup === group.id && (
-                                    <div className="bg-black/40 border-t border-gray-800/50 p-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                    <div className="bg-black/40 border-t border-gray-800/50 p-4 space-y-4 animate-in slide-in-from-top-2">
                                         {group.items.map(a => (
                                             <div key={a.id} className="bg-[#1C1C1E]/90 border border-gray-800 rounded-3xl overflow-hidden shadow-lg">
                                                 <button onClick={() => setExpandedRoutine(expandedRoutine === a.id ? null : a.id)} className="w-full p-5 flex justify-between items-center hover:bg-white/5 transition-colors">
-                                                    <div className="text-left">
-                                                        <p className="text-white font-black uppercase text-lg italic leading-none">{a.routine?.nombre}</p>
-                                                    </div>
+                                                    <div className="text-left"><p className="text-white font-black uppercase text-lg italic leading-none text-left">{a.routine?.nombre}</p></div>
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{a.routine?.exercise_links?.length || 0} EJERCICIOS</span>
                                                         <div className="w-8 h-8 rounded-lg bg-[#3ABFBC] flex items-center justify-center">
@@ -775,47 +819,27 @@ const StudentDashboard = ({ navigate }) => {
                                                         </div>
                                                     </div>
                                                 </button>
-                                                
                                                 {expandedRoutine === a.id && (
                                                     <div className="p-4 bg-black/40 space-y-4 border-t border-gray-800/50 text-left">
                                                         {a.routine?.descripcion && (
-                                                            <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl mb-2 flex gap-3 items-start">
+                                                            <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl mb-2 flex gap-3 items-start text-left">
                                                                 <TargetIcon size={18} className="text-amber-500 shrink-0 mt-0.5" />
-                                                                <div>
-                                                                    <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">OBJETIVO DEL DÍA</p>
-                                                                    <p className="text-white text-[13px] font-bold italic leading-snug uppercase">{a.routine.descripcion}</p>
+                                                                <div className="text-left">
+                                                                    <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1 text-left">OBJETIVO DEL DÍA</p>
+                                                                    <p className="text-white text-[13px] font-bold italic leading-snug uppercase text-left">{a.routine.descripcion}</p>
                                                                 </div>
                                                             </div>
                                                         )}
-
                                                         {a.routine?.exercise_links?.map((link, i) => (
-                                                            <div key={i} className="bg-gradient-to-br from-[#1C1C1E] to-black border border-gray-800 p-5 rounded-[1.5rem] shadow-sm">
-                                                                <div className="flex flex-col gap-3">
-                                                                    <span className="text-xl text-white font-black italic uppercase tracking-tighter leading-none">{link.exercise?.nombre}</span>
-                                                                    <div className="flex gap-2 mt-1">
-                                                                        <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center shadow-inner">
-                                                                            <p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none">Series</p>
-                                                                            <p className="text-[#3ABFBC] font-black text-sm leading-none">{link.sets}</p>
-                                                                        </div>
-                                                                        <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center shadow-inner">
-                                                                            <p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none">Repeticiones</p>
-                                                                            <p className="text-[#3ABFBC] font-black text-sm leading-none">{link.repetitions}</p>
-                                                                        </div>
-                                                                        {link.peso && link.peso !== "0" && (
-                                                                            <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center shadow-inner">
-                                                                                <p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none">Peso / Carga</p>
-                                                                                <p className="text-amber-500 font-black text-sm leading-none">{link.peso}kg</p>
-                                                                            </div>
-                                                                        )}
+                                                            <div key={i} className="bg-gradient-to-br from-[#1C1C1E] to-black border border-gray-800 p-5 rounded-[1.5rem] shadow-sm text-left">
+                                                                <div className="flex flex-col gap-3 text-left">
+                                                                    <span className="text-xl text-white font-black italic uppercase tracking-tighter leading-none text-left">{link.exercise?.nombre}</span>
+                                                                    <div className="flex gap-2">
+                                                                        <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center"><p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none">Series</p><p className="text-[#3ABFBC] font-black text-sm leading-none">{link.sets}</p></div>
+                                                                        <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center"><p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none">Repeticiones</p><p className="text-[#3ABFBC] font-black text-sm leading-none">{link.repetitions}</p></div>
+                                                                        {link.peso && link.peso !== "0" && <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center"><p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none">Peso / Carga</p><p className="text-amber-500 font-black text-sm leading-none">{link.peso}kg</p></div>}
                                                                     </div>
-                                                                    {link.notas && (
-                                                                        <div className="mt-2 bg-black/50 p-4 rounded-2xl border border-gray-800 shadow-inner">
-                                                                            <p className="text-[13px] text-gray-400 italic font-medium leading-snug">
-                                                                                <span className="text-[#3ABFBC] font-black not-italic mr-2 uppercase tracking-tighter text-[10px]">NOTAS:</span> 
-                                                                                {link.notas}
-                                                                            </p>
-                                                                        </div>
-                                                                    )}
+                                                                    {link.notas && <div className="mt-2 bg-black/50 p-4 rounded-2xl border border-gray-800 shadow-inner text-left"><p className="text-[13px] text-gray-400 italic font-medium leading-snug text-left"><span className="text-[#3ABFBC] font-black not-italic mr-2 uppercase tracking-tighter text-[10px]">NOTAS:</span> {link.notas}</p></div>}
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -851,9 +875,7 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
     const fetchAssignments = useCallback(async () => {
         setLoading(true);
         try {
-            const r = await axios.get(`${API_URL}/professor/assignments/student/${studentId}`, { 
-                headers: { Authorization: `Bearer ${authToken}` } 
-            });
+            const r = await axios.get(`${API_URL}/professor/assignments/student/${studentId}`, { headers: { Authorization: `Bearer ${authToken}` } });
             setAssignments(r.data);
         } catch (e) { setAssignments([]); }
         finally { setLoading(false); }
@@ -889,88 +911,77 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
         <div className="flex flex-col p-4 text-left flex-1">
             <EditGroupModal isVisible={editModalVisible} group={selectedGroupToEdit} onClose={() => setEditModalVisible(false)} onUpdate={fetchAssignments} />
             
-            <header className="mb-6">
-                <button onClick={() => navigate('dashboard')} className="text-[#3ABFBC] flex items-center gap-2 font-black italic uppercase tracking-tighter mb-4 text-sm group hover:translate-x-[-4px] transition-transform"><ArrowLeft size={18} strokeWidth={2.5}/> VOLVER</button>
-                <h1 className="text-3xl font-black italic text-white tracking-tighter uppercase leading-none">HISTORIAL: {studentName}</h1>
+            <header className="mb-6 text-left">
+                <button onClick={() => navigate('dashboard')} className="text-[#3ABFBC] flex items-center gap-2 font-black italic uppercase tracking-tighter mb-4 text-sm group transition-transform"><ArrowLeft size={18} strokeWidth={2.5}/> VOLVER</button>
+                <h1 className="text-3xl font-black italic text-white tracking-tighter uppercase leading-none text-left">HISTORIAL: {studentName}</h1>
             </header>
 
             {loading ? <div className="flex-1 flex items-center justify-center py-20"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
-                <div className="flex-1 overflow-y-auto space-y-4 pb-10 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto space-y-4 pb-10 custom-scrollbar text-left">
                     {groupedAssignments.length === 0 ? (
                         <div className="flex-1 flex flex-col items-center justify-center py-24 opacity-30 text-center">
-                            <TargetIcon size={44} strokeWidth={2.5} className="mb-4 mx-auto" /><h2 className="text-2xl font-black italic text-white uppercase tracking-tighter">SIN PLANES ASIGNADOS</h2>
+                            <TargetIcon size={44} strokeWidth={2.5} className="mb-4 mx-auto" /><h2 className="text-2xl font-black italic text-white uppercase tracking-tighter text-center">SIN PLANES ASIGNADOS</h2>
                         </div>
                     ) : groupedAssignments.map(group => (
-                        <div key={group.id} className={`rounded-[2rem] border bg-gradient-to-br from-[#1C1C1E]/80 to-[#0A0A0B]/80 backdrop-blur-sm overflow-hidden transition-all shadow-xl ${group.is_active ? 'border-[#3ABFBC] shadow-[0_0_20px_rgba(58,191,188,0.1)]' : 'border-gray-800'}`}>
-                            <div onClick={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)} className="p-6 flex justify-between items-center cursor-pointer active:bg-white/5 transition-colors">
-                                <div className="flex-1 min-w-0 pr-4">
-                                    <h3 className="text-2xl font-black italic uppercase text-white tracking-tighter leading-none mb-3 truncate">{group.name}</h3>
+                        <div key={group.id} className={`rounded-[2rem] border bg-gradient-to-br from-[#1C1C1E]/80 to-[#0A0A0B]/80 overflow-hidden shadow-xl text-left ${group.is_active ? 'border-[#3ABFBC]' : 'border-gray-800'}`}>
+                            <div onClick={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)} className="p-6 flex justify-between items-center cursor-pointer text-left">
+                                <div className="flex-1 min-w-0 pr-4 text-left">
+                                    <h3 className="text-2xl font-black italic uppercase text-white tracking-tighter leading-none mb-3 truncate text-left">{group.name}</h3>
                                     <div className="space-y-1.5 text-left">
-                                        <div className="flex items-center gap-2"><Calendar size={14} className="text-[#3ABFBC]"/><p className="text-[12px] text-white font-black uppercase italic leading-none">VENCE: {formatDisplayDate(group.due_date)}</p></div>
-                                        <div className="flex items-center gap-2"><User size={14} className="text-amber-500"/><p className="text-[12px] text-[#A9A9A9] font-black uppercase italic leading-none">PROF: {group.professor_name}</p></div>
+                                        <div className="flex items-center gap-2 text-left"><Calendar size={14} className="text-[#3ABFBC]"/><p className="text-[12px] text-white font-black uppercase italic leading-none text-left">VENCE: {formatDisplayDate(group.due_date)}</p></div>
+                                        <div className="flex items-center gap-2 text-left"><User size={14} className="text-amber-500"/><p className="text-[12px] text-[#A9A9A9] font-black uppercase italic leading-none text-left">PROF: {group.professor_name}</p></div>
                                     </div>
-                                    <div className="flex items-center gap-4 mt-4">
-                                        <p className="text-[10px] text-gray-500 font-black uppercase italic tracking-widest">{formatTimestamp(group.date)}</p>
-                                        {group.is_active && <div className="px-3 py-1.5 rounded-full bg-gradient-to-r from-[#3ABFBC] to-[#2E9B99] text-black text-[10px] font-black uppercase tracking-widest shadow-lg">ACTIVO</div>}
+                                    <div className="flex items-center gap-4 mt-4 text-left">
+                                        <p className="text-[10px] text-gray-500 font-black uppercase italic tracking-widest text-left">{formatTimestamp(group.date)}</p>
+                                        {group.is_active && <div className="px-3 py-1.5 rounded-full bg-[#3ABFBC] text-black text-[10px] font-black uppercase tracking-widest text-left">ACTIVO</div>}
                                     </div>
                                 </div>
-                                <div className="flex flex-col gap-3 items-end">
+                                <div className="flex flex-col gap-3 items-end shrink-0">
                                     <div className="flex gap-2">
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); setSelectedGroupToEdit(group); setEditModalVisible(true); }}
-                                            className="w-12 h-12 bg-gray-800 rounded-2xl flex items-center justify-center text-[#3ABFBC] active:scale-90 transition-all shadow-lg border border-gray-700"
-                                        >
-                                            <Edit3 size={20} />
-                                        </button>
-
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); handleToggleGroupActive(group); }} 
-                                            disabled={updating} 
-                                            className={`px-5 py-3 h-12 rounded-xl text-[10px] font-black uppercase italic shadow-lg active:scale-95 flex items-center gap-2 transition-all ${group.is_active ? 'bg-gradient-to-r from-red-600 to-red-800 text-white shadow-red-900/20' : 'bg-gradient-to-r from-[#3ABFBC] to-[#2E9B99] text-black shadow-cyan-900/20'}`}
-                                        >
+                                        <button onClick={(e) => { e.stopPropagation(); setSelectedGroupToEdit(group); setEditModalVisible(true); }} className="w-12 h-12 bg-gray-800 rounded-2xl flex items-center justify-center text-[#3ABFBC] border border-gray-700 shadow-lg"><Edit3 size={20} /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleToggleGroupActive(group); }} disabled={updating} className={`px-5 py-3 h-12 rounded-xl text-[10px] font-black uppercase italic shadow-lg flex items-center gap-2 transition-all ${group.is_active ? 'bg-red-600 text-white' : 'bg-[#3ABFBC] text-black'}`}>
                                             {updating ? <Loader2 className="animate-spin" size={14}/> : group.is_active ? <><XIcon size={14}/> INACTIVAR</> : <><CheckCircle size={14}/> ACTIVAR</>}
                                         </button>
                                     </div>
-                                    <div className="bg-white/10 w-12 h-12 rounded-2xl flex items-center justify-center border border-gray-700 shadow-inner">
+                                    <div className="bg-white/10 w-12 h-12 rounded-2xl flex items-center justify-center border border-gray-700">
                                         {expandedGroup === group.id ? <ChevronUp size={28} strokeWidth={2.5} className="text-[#3ABFBC]"/> : <ChevronDown size={28} strokeWidth={2.5} className="text-[#A9A9A9]"/>}
                                     </div>
                                 </div>
                             </div>
                             {expandedGroup === group.id && (
-                                <div className="bg-black/40 border-t border-gray-800/50 p-4 space-y-4 animate-in slide-in-from-top-2">
+                                <div className="bg-black/40 border-t border-gray-800/50 p-4 space-y-4 text-left animate-in slide-in-from-top-2">
                                     {group.items.map(a => (
-                                        <div key={a.id} className="bg-[#1C1C1E]/90 border border-gray-800 rounded-3xl overflow-hidden shadow-sm">
-                                            <button onClick={() => setExpandedRoutine(expandedRoutine === a.id ? null : a.id)} className="w-full p-4 flex justify-between items-center hover:bg-white/5 transition-colors">
-                                                <p className="text-[#3ABFBC] font-black uppercase text-lg italic leading-none">{a.routine?.nombre}</p>
+                                        <div key={a.id} className="bg-[#1C1C1E]/90 border border-gray-800 rounded-3xl overflow-hidden text-left shadow-sm">
+                                            <button onClick={() => setExpandedRoutine(expandedRoutine === a.id ? null : a.id)} className="w-full p-4 flex justify-between items-center text-left">
+                                                <p className="text-[#3ABFBC] font-black uppercase text-lg italic leading-none text-left">{a.routine?.nombre}</p>
                                                 <div className="flex items-center gap-2 text-left">
-                                                    <span className="text-[9px] font-black text-gray-600 uppercase">{a.routine?.exercise_links?.length || 0} EJERCICIOS</span>
+                                                    <span className="text-[9px] font-black text-gray-600 uppercase text-left">{a.routine?.exercise_links?.length || 0} EJERCICIOS</span>
                                                     <div className="w-8 h-8 rounded-lg bg-white/10 border border-gray-800 flex items-center justify-center">
                                                         {expandedRoutine === a.id ? <ChevronUp size={18} strokeWidth={2.5} className="text-[#3ABFBC]"/> : <ChevronDown size={18} strokeWidth={2.5} className="text-[#A9A9A9]"/>}
                                                     </div>
                                                 </div>
                                             </button>
                                             {expandedRoutine === a.id && (
-                                                <div className="p-4 bg-black/60 space-y-4 border-t border-gray-800/50">
+                                                <div className="p-4 bg-black/60 space-y-4 border-t border-gray-800/50 text-left">
                                                     {a.routine?.descripcion && (
-                                                        <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl flex gap-3 items-start">
+                                                        <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl flex gap-3 items-start text-left">
                                                             <TargetIcon size={18} className="text-amber-500 mt-0.5 shrink-0" />
-                                                            <div>
-                                                                <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">OBJETIVO DEL DÍA</p>
-                                                                <p className="text-white text-[13px] font-bold italic leading-snug uppercase">{a.routine.descripcion}</p>
+                                                            <div className="text-left">
+                                                                <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1 text-left">OBJETIVO DEL DÍA</p>
+                                                                <p className="text-white text-[13px] font-bold italic leading-snug uppercase text-left">{a.routine.descripcion}</p>
                                                             </div>
                                                         </div>
                                                     )}
-
                                                     {a.routine?.exercise_links?.map((link, i) => (
-                                                        <div key={i} className="bg-gradient-to-br from-[#1C1C1E] to-[#141415] border border-gray-800 p-5 rounded-2xl text-left shadow-inner">
-                                                            <div className="flex flex-col gap-3">
-                                                                <span className="text-xl text-white font-black italic uppercase tracking-tighter leading-none">{link.exercise?.nombre}</span>
+                                                        <div key={i} className="bg-[#1C1C1E] border border-gray-800 p-5 rounded-2xl text-left shadow-inner">
+                                                            <div className="flex flex-col gap-3 text-left">
+                                                                <span className="text-xl text-white font-black italic uppercase tracking-tighter leading-none text-left">{link.exercise?.nombre}</span>
                                                                 <div className="flex gap-2">
-                                                                    <div className="flex-1 bg-black border border-gray-800 py-2 rounded-lg text-center"><p className="text-[7px] text-gray-500 font-black mb-1 leading-none uppercase">Series</p><p className="text-[#3ABFBC] font-black text-xs leading-none">{link.sets}</p></div>
-                                                                    <div className="flex-1 bg-black border border-gray-800 py-2 rounded-lg text-center"><p className="text-[7px] text-gray-500 font-black mb-1 leading-none uppercase">Repeticiones</p><p className="text-[#3ABFBC] font-black text-xs leading-none">{link.repetitions}</p></div>
-                                                                    {link.peso && link.peso !== "0" && (<div className="flex-1 bg-black border border-gray-800 py-2 rounded-lg text-center"><p className="text-[7px] text-gray-500 font-black mb-1 leading-none uppercase">Peso / Carga</p><p className="text-amber-500 font-black text-xs leading-none">{link.peso}kg</p></div>)}
+                                                                    <div className="flex-1 bg-black border border-gray-800 py-2 rounded-lg text-center"><p className="text-[7px] text-gray-500 font-black mb-1 leading-none uppercase text-center">Series</p><p className="text-[#3ABFBC] font-black text-xs leading-none text-center">{link.sets}</p></div>
+                                                                    <div className="flex-1 bg-black border border-gray-800 py-2 rounded-lg text-center"><p className="text-[7px] text-gray-500 font-black mb-1 leading-none uppercase text-center">Repeticiones</p><p className="text-[#3ABFBC] font-black text-xs leading-none text-center">{link.repetitions}</p></div>
+                                                                    {link.peso && link.peso !== "0" && <div className="flex-1 bg-black border border-gray-800 py-2 rounded-lg text-center"><p className="text-[7px] text-gray-500 font-black mb-1 leading-none uppercase text-center">Peso / Carga</p><p className="text-amber-500 font-black text-xs leading-none text-center">{link.peso}kg</p></div>}
                                                                 </div>
-                                                                {link.notas && <div className="mt-1 bg-black/50 p-3 rounded-xl border border-gray-800 shadow-inner"><p className="text-xs text-gray-500 italic"><span className="text-[#3ABFBC] font-black not-italic mr-2 text-[9px] uppercase">NOTAS:</span> {link.notas}</p></div>}
+                                                                {link.notas && <div className="mt-1 bg-black/50 p-3 rounded-xl border border-gray-800 text-left"><p className="text-xs text-gray-500 italic text-left"><span className="text-[#3ABFBC] font-black not-italic mr-2 text-[9px] uppercase text-left">NOTAS:</span> {link.notas}</p></div>}
                                                             </div>
                                                         </div>
                                                     ))}
@@ -1056,7 +1067,6 @@ const App = () => {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black" />
             </div>
-            
             <div className="relative z-10 flex flex-col min-h-screen">
                 {renderScreen()}
             </div>
@@ -1080,15 +1090,15 @@ const AddStudentPage = ({ navigate }) => {
     return (
         <div className="p-6 flex flex-col items-center flex-1">
             <header className="mb-10 max-w-lg w-full text-left">
-                <button onClick={() => navigate('dashboard')} className="text-[#3ABFBC] flex items-center gap-2 font-black italic uppercase tracking-tighter mb-8 text-sm group hover:translate-x-[-4px] transition-transform"><ArrowLeft size={18} strokeWidth={2.5}/> VOLVER</button>
+                <button onClick={() => navigate('dashboard')} className="text-[#3ABFBC] flex items-center gap-2 font-black italic uppercase tracking-tighter mb-8 text-sm group transition-transform"><ArrowLeft size={18} strokeWidth={2.5}/> VOLVER</button>
                 <h1 className="text-4xl font-black italic text-white tracking-tighter uppercase text-left">ALTA ALUMNO</h1>
             </header>
-            <form onSubmit={handleSubmit} className="max-w-lg w-full space-y-4">
+            <form onSubmit={handleSubmit} className="max-w-lg w-full space-y-4 text-left">
                 <Input placeholder="NOMBRE COMPLETO" Icon={User} value={data.nombre} onChange={e => setData({...data, nombre: e.target.value})} required />
                 <Input placeholder="EMAIL" Icon={Mail} value={data.email} onChange={e => setData({...data, email: e.target.value})} required />
                 <Input placeholder="DNI" Icon={CreditCard} value={data.dni} onChange={e => setData({...data, dni: e.target.value})} required />
                 <Input placeholder="CONTRASEÑA" Icon={Lock} value={data.password} onChange={e => setData({...data, password: e.target.value})} isPassword required />
-                <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-[#3ABFBC] to-[#2E9B99] h-16 rounded-[1.5rem] font-black text-black text-lg italic uppercase shadow-[0_8px_20px_-5px_rgba(58,191,188,0.5)] mt-6 active:scale-95 transition-all flex justify-center items-center">{loading ? <Loader2 className="animate-spin" /> : "REGISTRAR ALUMNO"}</button>
+                <button type="submit" disabled={loading} className="w-full bg-[#3ABFBC] h-16 rounded-[1.5rem] font-black text-black text-lg italic uppercase shadow-lg mt-6 active:scale-95 transition-all flex justify-center items-center">{loading ? <Loader2 className="animate-spin" /> : "REGISTRAR ALUMNO"}</button>
             </form>
         </div>
     );
@@ -1143,65 +1153,65 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
                 }} 
             />
             <header className="mb-6 max-w-2xl mx-auto w-full text-left">
-                <button onClick={() => step > 1 ? setStep(step - 1) : navigate('dashboard')} className="text-[#3ABFBC] flex items-center gap-2 font-black italic uppercase tracking-tighter mb-4 text-xs group hover:translate-x-[-4px] transition-transform"><ArrowLeft size={18} strokeWidth={2.5}/> VOLVER</button>
+                <button onClick={() => step > 1 ? setStep(step - 1) : navigate('dashboard')} className="text-[#3ABFBC] flex items-center gap-2 font-black italic uppercase tracking-tighter mb-4 text-xs group transition-transform"><ArrowLeft size={18} strokeWidth={2.5}/> VOLVER</button>
                 <h1 className="text-2xl font-black italic text-white tracking-tighter uppercase leading-none text-left">NUEVA RUTINA: {studentName}</h1>
-                <div className="w-full h-1.5 bg-gray-800 rounded-full mt-4 overflow-hidden shadow-inner"><div className="h-full bg-gradient-to-r from-[#3ABFBC] to-emerald-400 transition-all duration-500 shadow-[0_0_10px_rgba(58,191,188,0.5)]" style={{width: `${(step/2)*100}%`}}></div></div>
+                <div className="w-full h-1.5 bg-gray-800 rounded-full mt-4 overflow-hidden shadow-inner"><div className="h-full bg-[#3ABFBC] transition-all duration-500" style={{width: `${(step/2)*100}%`}}></div></div>
             </header>
-            <main className="flex-1 max-w-2xl mx-auto w-full pb-10">
+            <main className="flex-1 max-w-2xl mx-auto w-full pb-10 text-left">
                 {step === 1 ? (
                     <div className="space-y-4 text-left">
                         <Input placeholder="NOMBRE DEL PLAN" value={groupData.name} onChange={e => setGroupData({...groupData, name: e.target.value})} Icon={Zap} />
                         <Input type="date" value={groupData.due_date} onChange={e => setGroupData({...groupData, due_date: e.target.value})} Icon={Calendar} />
-                        <div className="bg-gradient-to-br from-[#1C1C1E]/80 to-black/80 backdrop-blur-sm p-10 rounded-[2.5rem] border border-gray-800 text-center shadow-2xl mt-6">
-                            <p className="text-[#A9A9A9] font-black uppercase text-[10px] tracking-widest mb-8 opacity-60 italic">Variantes de Día / Bloques</p>
+                        <div className="bg-[#1C1C1E]/80 backdrop-blur-sm p-10 rounded-[2.5rem] border border-gray-800 text-center shadow-2xl mt-6">
+                            <p className="text-[#A9A9A9] font-black uppercase text-[10px] tracking-widest mb-8 opacity-60 italic text-center">Variantes de Día / Bloques</p>
                             <div className="flex justify-center items-center gap-10">
-                                <button onClick={() => updateDaysCount(Math.max(1, groupData.days - 1))} className="w-14 h-14 bg-gray-600 border border-gray-500 text-white rounded-2xl flex items-center justify-center disabled:opacity-20 active:scale-90 shadow-lg" disabled={groupData.days <= 1}><Minus strokeWidth={2.5}/></button>
-                                <span className="text-7xl font-black text-[#3ABFBC] italic drop-shadow-[0_0_20px_rgba(58,191,188,0.3)] tabular-nums">{groupData.days}</span>
-                                <button onClick={() => updateDaysCount(Math.min(5, groupData.days + 1))} className="w-14 h-14 bg-gradient-to-br from-[#3ABFBC] to-[#2E9B99] text-black rounded-2xl flex items-center justify-center disabled:opacity-20 active:scale-90 shadow-[0_4px_15px_rgba(58,191,188,0.4)]" disabled={groupData.days >= 5}><Plus strokeWidth={2.5}/></button>
+                                <button onClick={() => updateDaysCount(Math.max(1, groupData.days - 1))} className="w-14 h-14 bg-gray-800 border border-gray-700 text-white rounded-2xl flex items-center justify-center disabled:opacity-20 active:scale-90" disabled={groupData.days <= 1}><Minus strokeWidth={2.5}/></button>
+                                <span className="text-7xl font-black text-[#3ABFBC] italic tabular-nums text-center">{groupData.days}</span>
+                                <button onClick={() => updateDaysCount(Math.min(5, groupData.days + 1))} className="w-14 h-14 bg-[#3ABFBC] text-black rounded-2xl flex items-center justify-center disabled:opacity-20 active:scale-90" disabled={groupData.days >= 5}><Plus strokeWidth={2.5}/></button>
                             </div>
                         </div>
-                        <button onClick={() => setStep(2)} className="w-full bg-gradient-to-r from-[#3ABFBC] to-[#2E9B99] h-18 rounded-[2rem] font-black text-black text-xl italic uppercase shadow-[0_8px_20px_-5px_rgba(58,191,188,0.6)] mt-8 active:scale-95 transition-all h-16">SIGUIENTE PASO</button>
+                        <button onClick={() => setStep(2)} className="w-full bg-[#3ABFBC] h-16 rounded-[2rem] font-black text-black text-xl italic uppercase shadow-lg mt-8 active:scale-95 transition-all">SIGUIENTE PASO</button>
                     </div>
                 ) : (
                     <div className="space-y-8 text-left">
                         {routines.map((day, dIdx) => (
-                            <div key={dIdx} className="bg-gradient-to-b from-[#1C1C1E]/80 to-black/80 backdrop-blur-sm p-6 rounded-[2.5rem] border-l-8 border-[#3ABFBC] shadow-2xl overflow-hidden relative">
+                            <div key={dIdx} className="bg-gradient-to-b from-[#1C1C1E]/80 to-black/80 backdrop-blur-sm p-6 rounded-[2.5rem] border-l-8 border-[#3ABFBC] shadow-2xl overflow-hidden text-left">
                                 <input placeholder="Nombre" value={day.nombre} onChange={e => {const n = [...routines]; n[dIdx].nombre = e.target.value; setRoutines(n);}} className="bg-transparent text-[#3ABFBC] font-black uppercase text-2xl outline-none w-full italic border-b border-gray-800 pb-4 mb-4 text-left" />
-                                <div className="mb-6">
-                                    <label className="text-[10px] font-black text-[#A9A9A9] uppercase ml-2 mb-2 block tracking-widest">Objetivo del día</label>
-                                    <div className="flex items-start gap-3 bg-black/50 border border-gray-800 rounded-2xl p-4 focus-within:border-[#3ABFBC] transition-all shadow-inner">
+                                <div className="mb-6 text-left">
+                                    <label className="text-[10px] font-black text-[#A9A9A9] uppercase ml-2 mb-2 block tracking-widest text-left">Objetivo del día</label>
+                                    <div className="flex items-start gap-3 bg-black/50 border border-gray-800 rounded-2xl p-4 focus-within:border-[#3ABFBC] transition-all text-left">
                                         <AlignLeft size={16} className="text-gray-500 mt-1" />
-                                        <textarea value={day.descripcion} onChange={e => {const n = [...routines]; n[dIdx].descripcion = e.target.value; setRoutines(n);}} placeholder="EJ: ENFOQUE EN FUERZA..." rows={1} className="flex-1 bg-transparent text-[13px] text-white font-bold outline-none resize-none placeholder:opacity-50 uppercase italic" />
+                                        <textarea value={day.descripcion} onChange={e => {const n = [...routines]; n[dIdx].descripcion = e.target.value; setRoutines(n);}} placeholder="EJ: ENFOQUE EN FUERZA..." rows={1} className="flex-1 bg-transparent text-[13px] text-white font-bold outline-none resize-none placeholder:opacity-50 uppercase italic text-left" />
                                     </div>
                                 </div>
-                                <div className="space-y-4">
+                                <div className="space-y-4 text-left">
                                     {day.exercises.map((ex, eIdx) => (
-                                        <div key={eIdx} className="bg-black/50 p-5 rounded-2xl border border-gray-800 relative shadow-inner group text-left">
+                                        <div key={eIdx} className="bg-black/50 p-5 rounded-2xl border border-gray-800 relative shadow-inner text-left group">
                                             <div className="flex justify-between items-center mb-4"><p className="text-white font-black uppercase text-sm italic tracking-widest group-hover:text-[#3ABFBC] transition-colors">{ex.nombre}</p><button onClick={() => {
                                                 const n = [...routines]; 
                                                 const updatedDay = { ...n[dIdx] };
                                                 updatedDay.exercises = updatedDay.exercises.filter((_, idx) => idx !== eIdx);
                                                 n[dIdx] = updatedDay;
                                                 setRoutines(n);
-                                            }} className="text-red-500/40 hover:text-red-500 active:scale-90 transition-all"><Trash2 size={20} strokeWidth={2.5}/></button></div>
+                                            }} className="text-red-500 hover:text-red-400 active:scale-90 transition-all"><Trash2 size={20} strokeWidth={2.5}/></button></div>
                                             <div className="grid grid-cols-3 gap-3 mb-4 text-left">
-                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Sets</label><input type="number" value={ex.sets} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], sets:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none focus:border-[#3ABFBC] transition-all"/></div>
-                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Reps</label><input type="text" value={ex.repetitions} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], repetitions:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none focus:border-[#3ABFBC] transition-all"/></div>
-                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Peso</label><input type="text" value={ex.peso} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], peso:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-800 text-sm shadow-inner outline-none focus:border-[#3ABFBC] transition-all"/></div>
+                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Sets</label><input type="number" value={ex.sets} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], sets:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
+                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Reps</label><input type="text" value={ex.repetitions} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], repetitions:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
+                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Peso</label><input type="text" value={ex.peso} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], peso:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-800 text-sm shadow-inner outline-none"/></div>
                                             </div>
-                                            <div className="relative text-left">
-                                                <label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Indicaciones del Profesor</label>
+                                            <div className="text-left">
+                                                <label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block text-left">Indicaciones del Profesor</label>
                                                 <div className="flex items-start gap-3 bg-black border border-gray-800 rounded-xl p-3 focus-within:border-[#3ABFBC] transition-all">
-                                                    <textarea value={ex.notas} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], notas:e.target.value}; n[dIdx]=d; setRoutines(n);}} placeholder="EJ: DESCANSAR 60 SEG..." rows={1} className="flex-1 bg-transparent text-[12px] text-white font-bold outline-none resize-none placeholder:opacity-50 uppercase italic leading-none" />
+                                                    <textarea value={ex.notas} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], notas:e.target.value}; n[dIdx]=d; setRoutines(n);}} placeholder="EJ: DESCANSAR 60 SEG..." rows={1} className="flex-1 bg-transparent text-[12px] text-white font-bold outline-none resize-none placeholder:opacity-50 uppercase italic leading-none text-left" />
                                                 </div>
                                             </div>
                                         </div>
                                     ))}
-                                    <button onClick={() => { setCurrentDayIdx(dIdx); setIsSelectorOpen(true); }} className="w-full border-2 border-dashed border-gray-800 h-16 rounded-[1.5rem] text-[#A9A9A9] font-black uppercase text-[10px] tracking-widest mt-4 flex items-center justify-center gap-3 hover:border-[#3ABFBC]/50 hover:text-white hover:bg-[#3ABFBC]/5 active:scale-[0.98] transition-all"><PlusSquare size={20} strokeWidth={2.5}/> AÑADIR EJERCICIO</button>
+                                    <button onClick={() => { setCurrentDayIdx(dIdx); setIsSelectorOpen(true); }} className="w-full border-2 border-dashed border-gray-800 h-16 rounded-[1.5rem] text-[#A9A9A9] font-black uppercase text-[10px] tracking-widest mt-4 flex items-center justify-center gap-3 transition-all"><PlusSquare size={20} strokeWidth={2.5}/> AÑADIR EJERCICIO</button>
                                 </div>
                             </div>
                         ))}
-                        <button onClick={handleFinalSubmit} disabled={isSaving} className="w-full bg-gradient-to-r from-[#3ABFBC] to-[#2E9B99] h-20 rounded-[2.5rem] font-black text-black text-xl italic uppercase shadow-[0_10px_30px_-5px_rgba(58,191,188,0.5)] mt-10 active:scale-95 transition-all flex items-center justify-center">
+                        <button onClick={handleFinalSubmit} disabled={isSaving} className="w-full bg-[#3ABFBC] h-20 rounded-[2.5rem] font-black text-black text-xl italic uppercase shadow-lg mt-10 active:scale-95 transition-all flex items-center justify-center">
                             {isSaving ? <Loader2 className="animate-spin" /> : "ASIGNAR PLAN COMPLETO"}
                         </button>
                     </div>
@@ -1255,11 +1265,7 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
                     setAvailableExercises(prev => [...prev, created]);
                 }
                 onAddExercise(created); 
-            } else {
-                const existing = (existingExercises || []).find(ex => ex.nombre.toLowerCase() === newEx.nombre.trim().toLowerCase());
-                if (existing) onAddExercise(existing);
             }
-
             setIsCreating(false); 
             setNewEx({ nombre: '', grupo_muscular: 'Pectoral' }); 
             onClose();
@@ -1271,36 +1277,36 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
     };
 
     return (
-        <div className="fixed inset-0 z-[150] bg-black bg-opacity-95 flex items-center justify-center p-4 backdrop-blur-3xl text-left">
-            <div className="bg-[#1C1C1E] w-full max-w-xl rounded-[2.5rem] border border-gray-800 p-8 flex flex-col h-[80vh] shadow-2xl animate-in slide-in-from-bottom-5">
-                <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter">BIBLIOTECA</h2><button onClick={onClose} className="text-gray-500 hover:text-white active:scale-90 transition-transform"><X size={32}/></button></div>
+        <div className="fixed inset-0 z-[150] bg-black/95 flex items-center justify-center p-4 backdrop-blur-3xl text-left">
+            <div className="bg-[#1C1C1E] w-full max-w-xl rounded-[2.5rem] border border-gray-800 p-8 flex flex-col h-[80vh] shadow-2xl text-left">
+                <div className="flex justify-between items-center mb-6 text-left"><h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter text-left">BIBLIOTECA</h2><button onClick={onClose} className="text-gray-500 hover:text-white transition-transform"><X size={32}/></button></div>
                 {isCreating ? (
                     <div className="space-y-5 text-left">
                         <Input placeholder="NOMBRE" value={newEx.nombre} onChange={e => setNewEx({...newEx, nombre: e.target.value})} />
                         <label className="text-[11px] font-black text-gray-500 uppercase ml-2 mb-1 block tracking-widest text-left">Grupo Muscular</label>
-                        <select className="w-full bg-[#1C1C1E] h-14 rounded-2xl px-5 border border-gray-800 text-white font-black text-xs uppercase tracking-widest italic outline-none focus:border-[#3ABFBC]" value={newEx.grupo_muscular} onChange={e => setNewEx({...newEx, grupo_muscular: e.target.value})}>{muscleGroups.filter(m => m !== 'Todos').map(g => <option key={g} value={g}>{g}</option>)}</select>
+                        <select className="w-full bg-[#1C1C1E] h-14 rounded-2xl px-5 border border-gray-800 text-white font-black text-xs uppercase tracking-widest italic outline-none" value={newEx.grupo_muscular} onChange={e => setNewEx({...newEx, grupo_muscular: e.target.value})}>{muscleGroups.filter(m => m !== 'Todos').map(g => <option key={g} value={g}>{g}</option>)}</select>
                         <div className="flex gap-4 pt-6 text-center">
-                            <button onClick={() => setIsCreating(false)} className="flex-1 bg-gray-800 text-white h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">CANCELAR</button>
-                            <button onClick={handleCreateNew} disabled={loadingCreate} className="flex-1 bg-gradient-to-r from-[#3ABFBC] to-[#2E9B99] text-black h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest italic flex items-center justify-center shadow-lg active:scale-95 transition-all">
+                            <button onClick={() => setIsCreating(false)} className="flex-1 bg-gray-800 text-white h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest">CANCELAR</button>
+                            <button onClick={handleCreateNew} disabled={loadingCreate} className="flex-1 bg-[#3ABFBC] text-black h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest italic flex items-center justify-center shadow-lg active:scale-95 transition-all">
                                 {loadingCreate ? <Loader2 className="animate-spin"/> : "CREAR"}
                             </button>
                         </div>
                     </div>
                 ) : (
                     <>
-                        <div className="flex gap-3 mb-6">
+                        <div className="flex gap-3 mb-6 text-left">
                             <div className="relative flex-1 text-left">
                                 <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
                                 <input 
-                                    className="w-full bg-black border border-gray-800 h-14 pl-14 pr-6 rounded-2xl text-white text-sm font-bold outline-none focus:border-[#3ABFBC] transition-all shadow-inner" 
+                                    className="w-full bg-black border border-gray-800 h-14 pl-14 pr-6 rounded-2xl text-white text-sm font-bold outline-none focus:border-[#3ABFBC] text-left" 
                                     placeholder="BUSCAR..." 
                                     value={search} 
                                     onChange={e => setSearch(e.target.value)} 
                                 />
                             </div>
-                            <div className="w-36">
+                            <div className="w-36 text-left">
                                 <select 
-                                    className="w-full bg-black border border-gray-800 h-14 px-4 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest italic outline-none focus:border-[#3ABFBC] transition-all"
+                                    className="w-full bg-black border border-gray-800 h-14 px-4 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest italic outline-none focus:border-[#3ABFBC]"
                                     value={filterMuscle}
                                     onChange={e => setFilterMuscle(e.target.value)}
                                 >
@@ -1308,25 +1314,25 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
                                 </select>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar text-left">
                             {filtered.length === 0 ? (
                                 <div className="text-center py-10 opacity-30">
                                     <Search size={40} className="mx-auto mb-2" />
-                                    <p className="text-[10px] font-black uppercase tracking-widest">Sin resultados</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-center">Sin resultados</p>
                                 </div>
                             ) : filtered.map(ex => (
-                                <button key={ex.id} onClick={() => { onAddExercise(ex); onClose(); }} className="w-full p-5 bg-gradient-to-br from-black to-[#0d0d0d] rounded-2xl border border-gray-800 flex justify-between items-center active:border-[#3ABFBC] group transition-all text-left shadow-lg">
+                                <button key={ex.id} onClick={() => { onAddExercise(ex); onClose(); }} className="w-full p-5 bg-gradient-to-br from-black to-[#0d0d0d] rounded-2xl border border-gray-800 flex justify-between items-center group transition-all text-left shadow-lg">
                                     <div className="text-left">
-                                        <span className="text-white font-black uppercase text-sm block group-active:text-[#3ABFBC] transition-colors">{ex.nombre}</span>
-                                        <span className="text-[10px] text-[#A9A9A9] font-black uppercase tracking-widest">{ex.grupo_muscular}</span>
+                                        <span className="text-white font-black uppercase text-sm block group-active:text-[#3ABFBC] text-left">{ex.nombre}</span>
+                                        <span className="text-[10px] text-[#A9A9A9] font-black uppercase tracking-widest text-left">{ex.grupo_muscular}</span>
                                     </div>
-                                    <div className="w-10 h-10 rounded-xl bg-black border border-gray-800 flex items-center justify-center group-active:bg-[#3ABFBC] group-active:text-black transition-all">
+                                    <div className="w-10 h-10 rounded-xl bg-black border border-gray-800 flex items-center justify-center">
                                         <PlusCircle size={24} strokeWidth={2.5} className="opacity-40 group-hover:opacity-100 transition-opacity" />
                                     </div>
                                 </button>
                             ))}
                         </div>
-                        <button onClick={() => setIsCreating(true)} className="w-full bg-[#3ABFBC]/5 border border-[#3ABFBC]/30 text-[#3ABFBC] h-16 rounded-[1.5rem] text-[10px] font-black uppercase mt-6 italic active:bg-[#3ABFBC] active:text-black flex items-center justify-center gap-3 transition-all hover:bg-[#3ABFBC]/10 active:scale-[0.98] shadow-lg"><PlusSquare size={20} strokeWidth={2.5}/> CREAR NUEVO EJERCICIO</button>
+                        <button onClick={() => setIsCreating(true)} className="w-full bg-[#3ABFBC]/5 border border-[#3ABFBC]/30 text-[#3ABFBC] h-16 rounded-[1.5rem] text-[10px] font-black uppercase mt-6 italic active:bg-[#3ABFBC] active:text-black flex items-center justify-center gap-3 shadow-lg"><PlusSquare size={20} strokeWidth={2.5}/> CREAR NUEVO EJERCICIO</button>
                     </>
                 )}
             </div>
@@ -1389,7 +1395,6 @@ const AppWrapper = () => (
             .tracking-widest { letter-spacing: 0.12em; }
             .tracking-tighter { letter-spacing: -0.04em; }
 
-            /* MEJORA VISIBILIDAD CALENDARIO */
             input[type="date"]::-webkit-calendar-picker-indicator {
                 filter: invert(0.8) sepia(1) saturate(5) hue-rotate(130deg) brightness(1.2);
                 opacity: 1;
