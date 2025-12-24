@@ -2,36 +2,33 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <!-- Configuración para evitar zoom y mejorar la experiencia móvil (PWA) -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>ND Training - App</title>
 
-    <!-- Enlace al manifiesto (Debe estar en la raíz de tu proyecto) -->
-    <link rel="manifest" href="/manifest.json" />
+    <!-- Cambiamos /manifest.json por ./manifest.json -->
+    <link rel="manifest" href="./manifest.json" />
 
-    <!-- Color de la barra de estado en Android -->
     <meta name="theme-color" content="#3ABFBC" />
 
-    <!-- Configuración específica para iOS (Apple) -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ND Training" />
     <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/vikingo-44/Gym-App-Backend/main/assets/logoND.png" />
 
-    <!-- Icono para navegadores -->
     <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/vikingo-44/Gym-App-Backend/main/assets/logoND.png" />
   </head>
   <body>
     <div id="root"></div>
 
-    <!-- Script principal de tu App -->
+    <!-- Vite manejará esta ruta al compilar, pero es mejor mantener coherencia -->
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- Registro del Service Worker para funcionamiento Offline y PWA -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+          // IMPORTANTE: Cambiamos '/sw.js' por './sw.js'
+          // Esto permite que el Service Worker se encuentre en la carpeta actual
+          navigator.serviceWorker.register('./sw.js')
             .then(registration => {
               console.log('SW registrado con éxito:', registration.scope);
             })
