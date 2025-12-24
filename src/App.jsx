@@ -6,7 +6,7 @@ import {
     RefreshCcw, Key, Save, PlusCircle, Trash2, Zap, Calendar, List,
     Dumbbell, Filter, Minus, Info, ShieldCheck, AlertCircle, PlusSquare, Settings, History,
     Check, XCircle as XIcon, ChevronDown, ChevronUp, ClipboardList, Target, Sparkles, Layout,
-    MessageSquare, AlignLeft, Edit3, Target as TargetIcon
+    MessageSquare, AlignLeft, Edit3, Target as TargetIcon, ChevronLeft
 } from 'lucide-react';
 
 // ----------------------------------------------------------------------
@@ -35,6 +35,11 @@ const formatTimestamp = (isoString) => {
         month: '2-digit',
         year: 'numeric'
     });
+};
+
+// Utilidad para generar clave aleatoria
+const generateRandomPassword = () => {
+    return Math.random().toString(36).slice(-8);
 };
 
 // ----------------------------------------------------------------------
@@ -445,14 +450,18 @@ const ResetPasswordModal = ({ isVisible, onClose, targetUser, mode = 'profile' }
     );
 };
 
-const ConfirmResetModal = ({ isVisible, student, onConfirm, onClose, loading }) => {
+const ConfirmResetModal = ({ isVisible, student, password, onConfirm, onClose, loading }) => {
     if (!isVisible || !student) return null;
     return (
         <div className="fixed inset-0 z-[250] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl text-center">
             <div className="bg-[#1C1C1E] w-full max-w-sm rounded-[2.5rem] border border-gray-800 p-10 shadow-2xl animate-in zoom-in duration-300">
                 <div className="bg-red-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20"><AlertCircle size={40} className="text-red-500" /></div>
                 <h2 className="text-2xl font-black italic text-white uppercase tracking-tighter mb-4">¿RESET DE CLAVE?</h2>
-                <p className="text-[12px] font-black text-gray-400 uppercase tracking-widest italic mb-8 leading-tight text-center">ESTÁS POR RESETEAR LA CLAVE DE: <span className="text-white">{student.nombre}</span><br/>A LA CLAVE: <span className="text-[#3ABFBC]">"tunuevacontraseña"</span></p>
+                <div className="bg-black/50 p-6 rounded-3xl border border-gray-800 mb-8">
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest italic mb-3">NUEVA CLAVE GENERADA</p>
+                    <p className="text-3xl font-black text-[#3ABFBC] tracking-widest tabular-nums">{password}</p>
+                </div>
+                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest italic mb-8 leading-tight text-center">ASEGÚRATE DE COPIARLA PARA <span className="text-white">{student.nombre}</span></p>
                 <div className="flex flex-col gap-3">
                     <button onClick={onConfirm} disabled={loading} className="w-full bg-red-600 h-14 rounded-2xl font-black text-white italic uppercase flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-red-900/30">{loading ? <Loader2 className="animate-spin" /> : "SÍ, RESETEAR AHORA"}</button>
                     <button onClick={onClose} disabled={loading} className="w-full bg-gray-800 h-14 rounded-2xl font-black text-gray-500 italic uppercase active:scale-95 transition-all">CANCELAR</button>
@@ -514,7 +523,11 @@ const ProfessorDashboard = ({ navigate }) => {
     const [showInfo, setShowInfo] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
     const [toast, setToast] = useState({ msg: '', type: '' });
-    const [resetConfirm, setResetConfirm] = useState({ visible: false, student: null, loading: false });
+    const [resetConfirm, setResetConfirm] = useState({ visible: false, student: null, password: '', loading: false });
+
+    // ESTADO DE PAGINACIÓN
+    const [currentPage, setCurrentPage] = useState(1);
+    const studentsPerPage = 20;
 
     const refresh = useCallback(() => {
         setLoading(true);
@@ -526,28 +539,45 @@ const ProfessorDashboard = ({ navigate }) => {
 
     useEffect(() => { refresh(); }, [refresh]);
 
+    // Función para abrir el reset con clave aleatoria
+    const openResetConfirm = (student) => {
+        const newPass = generateRandomPassword();
+        setResetConfirm({ visible: true, student, password: newPass, loading: false });
+    };
+
     const handleConfirmReset = async () => {
-        const student = resetConfirm.student;
+        const { student, password } = resetConfirm;
         if (!student) return;
         setResetConfirm(prev => ({ ...prev, loading: true }));
         try {
-            await axios.patch(`${API_URL}/users/student/${student.id}`, { password: "tunuevacontraseña" }, { headers: { Authorization: `Bearer ${authToken}` } });
+            await axios.patch(`${API_URL}/users/student/${student.id}`, { password: password }, { headers: { Authorization: `Bearer ${authToken}` } });
             setToast({ msg: `¡RESET EXITOSO!`, type: 'success' });
-            setResetConfirm({ visible: false, student: null, loading: false });
+            setResetConfirm({ visible: false, student: null, password: '', loading: false });
         } catch (e) {
             setToast({ msg: 'ERROR EN RESET', type: 'error' });
             setResetConfirm(prev => ({ ...prev, loading: false }));
         }
     };
 
+    // FILTRADO Y ORDENAMIENTO
     const filtered = (students || [])
         .filter(s => (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || (s.dni || "").toString().includes(search))
         .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
 
+    // LÓGICA DE PAGINACIÓN
+    const totalPages = Math.ceil(filtered.length / studentsPerPage);
+    const startIndex = (currentPage - 1) * studentsPerPage;
+    const paginatedStudents = filtered.slice(startIndex, startIndex + studentsPerPage);
+
+    // Volver a la página 1 cuando se busca algo nuevo
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search]);
+
     return (
         <div className="flex flex-col text-left flex-1">
             <Notification msg={toast.msg} type={toast.type} onClose={() => setToast({ msg: '', type: '' })} />
-            <ConfirmResetModal isVisible={resetConfirm.visible} student={resetConfirm.student} loading={resetConfirm.loading} onConfirm={handleConfirmReset} onClose={() => setResetConfirm({ visible: false, student: null, loading: false })} />
+            <ConfirmResetModal isVisible={resetConfirm.visible} student={resetConfirm.student} password={resetConfirm.password} loading={resetConfirm.loading} onConfirm={handleConfirmReset} onClose={() => setResetConfirm({ visible: false, student: null, password: '', loading: false })} />
             <StudentInfoModal isVisible={showInfo} onClose={() => setShowInfo(false)} student={selectedStudent} onUpdate={refresh} />
             <ResetPasswordModal isVisible={showProfile} onClose={() => setShowProfile(false)} targetUser={userData} mode="profile" />
 
@@ -568,46 +598,77 @@ const ProfessorDashboard = ({ navigate }) => {
             </header>
 
             <main className="p-4 flex-1">
-                <div className="relative mb-6 max-w-xl mx-auto">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
-                    <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-12 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
+                {/* CONTENEDOR DE BÚSQUEDA Y PAGINACIÓN ARRIBA */}
+                <div className="max-w-2xl mx-auto flex flex-col md:flex-row items-center gap-4 mb-8">
+                    <div className="relative flex-1 w-full">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
+                        <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
+                    </div>
+
+                    {/* PAGINACIÓN COMPACTA ARRIBA */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
+                            <button 
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
+                            >
+                                <ChevronLeft size={20} />
+                            </button>
+                            
+                            <div className="px-2 text-center">
+                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block leading-none mb-1">Página</span>
+                                <span className="text-white font-black italic text-sm tabular-nums">{currentPage} / {totalPages}</span>
+                            </div>
+
+                            <button 
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
+                            >
+                                <ChevronRight size={20} />
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-16">
-                        {filtered.map(s => (
-                            <div key={s.id} className="bg-[#1C1C1E]/80 backdrop-blur-sm rounded-3xl p-5 border border-gray-800 shadow-2xl group transition-all relative overflow-hidden min-h-[160px]">
-                                <div className="absolute -right-4 -bottom-4 pointer-events-none z-0">
-                                    <Dumbbell 
-                                        className="text-white opacity-[0.04] w-28 h-28 -rotate-12 group-hover:scale-110 transition-transform duration-700" 
-                                        strokeWidth={3}
-                                    />
-                                </div>
-                                
-                                <div className="flex items-center mb-6 relative z-10">
-                                    <div className="w-12 h-12 rounded-2xl bg-[#3ABFBC] flex items-center justify-center mr-4 shadow-lg group-hover:scale-110 transition-transform"><User size={24} color="black" /></div>
-                                    <div className="min-w-0 flex-1 overflow-hidden">
-                                        <h3 className="text-sm font-black italic text-white uppercase truncate">{s.nombre}</h3>
-                                        <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate">{s.email}</p>
+                    <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-16">
+                            {paginatedStudents.map(s => (
+                                <div key={s.id} className="bg-[#1C1C1E]/80 backdrop-blur-sm rounded-3xl p-5 border border-gray-800 shadow-2xl group transition-all relative overflow-hidden min-h-[160px]">
+                                    <div className="absolute -right-4 -bottom-4 pointer-events-none z-0">
+                                        <Dumbbell 
+                                            className="text-white opacity-[0.04] w-28 h-28 -rotate-12 group-hover:scale-110 transition-transform duration-700" 
+                                            strokeWidth={3}
+                                        />
+                                    </div>
+                                    
+                                    <div className="flex items-center mb-6 relative z-10">
+                                        <div className="w-12 h-12 rounded-2xl bg-[#3ABFBC] flex items-center justify-center mr-4 shadow-lg group-hover:scale-110 transition-transform"><User size={24} color="black" /></div>
+                                        <div className="min-w-0 flex-1 overflow-hidden">
+                                            <h3 className="text-sm font-black italic text-white uppercase truncate">{s.nombre}</h3>
+                                            <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate">{s.email}</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-2 relative z-10">
+                                        <button onClick={() => { setSelectedStudent(s); setShowInfo(true); }} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
+                                            <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><Info size={16} strokeWidth={2.5}/> Info</span>
+                                        </button>
+                                        <button onClick={() => openResetConfirm(s)} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-amber-500 hover:bg-amber-500 hover:text-black hover:border-amber-500 active:scale-95 transition-all duration-200 shadow-sm">
+                                            <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><Key size={16} strokeWidth={2.5}/> Reset</span>
+                                        </button>
+                                        <button onClick={() => navigate('viewRoutine', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
+                                            <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><History size={16} strokeWidth={2.5}/> Histo</span>
+                                        </button>
+                                        <button onClick={() => navigate('createRoutineGroup', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-[#3ABFBC] hover:bg-[#3ABFBC] hover:text-black hover:border-[#3ABFBC] active:scale-95 transition-all duration-200 shadow-sm">
+                                            <span className="text-[7px] font-black mt-1 uppercase italic text-center flex flex-col items-center"><Dumbbell size={16} strokeWidth={2.5}/> Nueva</span>
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-4 gap-2 relative z-10">
-                                    <button onClick={() => { setSelectedStudent(s); setShowInfo(true); }} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
-                                        <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><Info size={16} strokeWidth={2.5}/> Info</span>
-                                    </button>
-                                    <button onClick={() => setResetConfirm({ visible: true, student: s, loading: false })} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-amber-500 hover:bg-amber-500 hover:text-black hover:border-amber-500 active:scale-95 transition-all duration-200 shadow-sm">
-                                        <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><Key size={16} strokeWidth={2.5}/> Reset</span>
-                                    </button>
-                                    <button onClick={() => navigate('viewRoutine', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black hover:border-white active:scale-95 transition-all duration-200 shadow-sm">
-                                        <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><History size={16} strokeWidth={2.5}/> Histo</span>
-                                    </button>
-                                    <button onClick={() => navigate('createRoutineGroup', { studentId: s.id, studentName: s.nombre })} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-[#3ABFBC] hover:bg-[#3ABFBC] hover:text-black hover:border-[#3ABFBC] active:scale-95 transition-all duration-200 shadow-sm">
-                                        <span className="text-[7px] font-black mt-1 uppercase italic text-center flex flex-col items-center"><Dumbbell size={16} strokeWidth={2.5}/> Nueva</span>
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    </>
                 )}
             </main>
         </div>
