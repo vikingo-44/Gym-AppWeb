@@ -6,7 +6,7 @@ import {
     RefreshCcw, Key, Save, PlusCircle, Trash2, Zap, Calendar, List,
     Dumbbell, Filter, Minus, Info, ShieldCheck, AlertCircle, PlusSquare, Settings, History,
     Check, XCircle as XIcon, ChevronDown, ChevronUp, ClipboardList, Target, Sparkles, Layout,
-    MessageSquare, AlignLeft, Edit3, Target as TargetIcon, ChevronLeft, Fingerprint
+    MessageSquare, AlignLeft, Edit3, Target as TargetIcon, ChevronLeft, Fingerprint, Shield
 } from 'lucide-react';
 
 // ----------------------------------------------------------------------
@@ -859,7 +859,7 @@ const StudentDashboard = ({ navigate }) => {
 };
 
 // ----------------------------------------------------------------------
-// 8. HISTORIAL (VISTA PROFESOR)
+// 8. HISTORIAL (VISTA PROFESOR - VISIBILIDAD GLOBAL)
 // ----------------------------------------------------------------------
 const StudentRoutineView = ({ navigate, studentId, studentName }) => {
     const { authToken, API_URL } = useAuth();
@@ -875,7 +875,8 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
     const fetchAssignments = useCallback(async () => {
         setLoading(true);
         try {
-            const r = await axios.get(`${API_URL}/professor/assignments/student/${studentId}`, { headers: { Authorization: `Bearer ${authToken}` } });
+            // <--- CAMBIO CLAVE: Usamos el nuevo endpoint global para que todos vean todo --->
+            const r = await axios.get(`${API_URL}/professor/assignments/student/${studentId}/global`, { headers: { Authorization: `Bearer ${authToken}` } });
             setAssignments(r.data);
         } catch (e) { setAssignments([]); }
         finally { setLoading(false); }
@@ -899,7 +900,15 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
             const key = groupObj ? `group-${groupObj.id}` : `solo-${a.id}`;
             const groupName = groupObj?.nombre || a.routine?.nombre || "PLAN INDIVIDUAL";
             if (!groupsMap.has(key)) {
-                groupsMap.set(key, { id: key, name: groupName, due_date: groupObj?.fecha_vencimiento, professor_name: a.professor?.nombre || "N/A", is_active: false, date: a.assigned_at, items: [] });
+                groupsMap.set(key, { 
+                    id: key, 
+                    name: groupName, 
+                    due_date: groupObj?.fecha_vencimiento, 
+                    professor_name: a.professor?.nombre || "N/A", 
+                    is_active: false, 
+                    date: a.assigned_at, 
+                    items: [] 
+                });
             }
             groupsMap.get(key).items.push(a);
             if (a.is_active) groupsMap.get(key).is_active = true;
@@ -913,7 +922,8 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
             
             <header className="mb-6 text-left">
                 <button onClick={() => navigate('dashboard')} className="text-[#3ABFBC] flex items-center gap-2 font-black italic uppercase tracking-tighter mb-4 text-sm group transition-transform"><ArrowLeft size={18} strokeWidth={2.5}/> VOLVER</button>
-                <h1 className="text-3xl font-black italic text-white tracking-tighter uppercase leading-none text-left">HISTORIAL: {studentName}</h1>
+                <h1 className="text-3xl font-black italic text-white tracking-tighter uppercase leading-none text-left">HISTORIAL GLOBAL</h1>
+                <p className="text-[10px] text-gray-500 font-black uppercase italic mt-1 text-left">ALUMNO: {studentName}</p>
             </header>
 
             {loading ? <div className="flex-1 flex items-center justify-center py-20"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
@@ -927,19 +937,17 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
                             <div onClick={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)} className="p-6 flex justify-between items-center cursor-pointer text-left">
                                 <div className="flex-1 min-w-0 pr-4 text-left">
                                     <h3 className="text-2xl font-black italic uppercase text-white tracking-tighter leading-none mb-3 truncate text-left">{group.name}</h3>
-                                    <div className="space-y-1.5 text-left">
-                                        <div className="flex items-center gap-2 text-left"><Calendar size={14} className="text-[#3ABFBC]"/><p className="text-[12px] text-white font-black uppercase italic leading-none text-left">VENCE: {formatDisplayDate(group.due_date)}</p></div>
-                                        <div className="flex items-center gap-2 text-left"><User size={14} className="text-amber-500"/><p className="text-[12px] text-[#A9A9A9] font-black uppercase italic leading-none text-left">PROF: {group.professor_name}</p></div>
+                                    <div className="space-y-1.5 text-left font-black uppercase italic text-[10px]">
+                                        <div className="flex items-center gap-2 text-left"><Calendar size={14} className="text-[#3ABFBC]"/><p className="text-white leading-none text-left">VENCE: {formatDisplayDate(group.due_date)}</p></div>
+                                        <div className="flex items-center gap-2 text-left text-amber-500"><Shield size={14}/><p className="leading-none text-left">PROFESOR: {group.professor_name}</p></div>
+                                        <div className="flex items-center gap-2 text-left text-gray-500"><History size={14}/><p className="leading-none text-left">FECHA: {formatTimestamp(group.date)}</p></div>
                                     </div>
-                                    <div className="flex items-center gap-4 mt-4 text-left">
-                                        <p className="text-[10px] text-gray-500 font-black uppercase italic tracking-widest text-left">{formatTimestamp(group.date)}</p>
-                                        {group.is_active && <div className="px-3 py-1.5 rounded-full bg-[#3ABFBC] text-black text-[10px] font-black uppercase tracking-widest text-left">ACTIVO</div>}
-                                    </div>
+                                    {group.is_active && <div className="mt-4 px-3 py-1.5 rounded-full bg-[#3ABFBC] text-black text-[10px] font-black uppercase inline-block italic">ASIGNACIÓN ACTIVA</div>}
                                 </div>
                                 <div className="flex flex-col gap-3 items-end shrink-0">
                                     <div className="flex gap-2">
                                         <button onClick={(e) => { e.stopPropagation(); setSelectedGroupToEdit(group); setEditModalVisible(true); }} className="w-12 h-12 bg-gray-800 rounded-2xl flex items-center justify-center text-[#3ABFBC] border border-gray-700 shadow-lg"><Edit3 size={20} /></button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleToggleGroupActive(group); }} disabled={updating} className={`px-5 py-3 h-12 rounded-xl text-[10px] font-black uppercase italic shadow-lg flex items-center gap-2 transition-all ${group.is_active ? 'bg-red-600 text-white' : 'bg-[#3ABFBC] text-black'}`}>
+                                        <button onClick={(e) => { e.stopPropagation(); handleToggleGroupActive(group); }} disabled={updating} className={`px-5 py-3 h-12 rounded-xl text-[10px] font-black uppercase italic shadow-lg flex items-center gap-2 transition-all ${group.is_active ? 'bg-red-600 text-white' : 'bg-[#3ABFBC]'}`}>
                                             {updating ? <Loader2 className="animate-spin" size={14}/> : group.is_active ? <><XIcon size={14}/> INACTIVAR</> : <><CheckCircle size={14}/> ACTIVAR</>}
                                         </button>
                                     </div>
