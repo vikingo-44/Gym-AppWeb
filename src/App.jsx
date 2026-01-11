@@ -248,22 +248,26 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
         }
     }, [isVisible, group]);
 
+    // --- CORRECCIÓN CRÍTICA EN ESTA FUNCIÓN ---
     const handleSave = async () => {
         setLoading(true);
         try {
-            const groupId = group.id.replace('group-', '');
-            // Actualizar cabecera del grupo
+            const groupId = group.id.toString().replace('group-', '');
+            
+            // 1. Actualizar cabecera del grupo (Plan)
+            // Si es un "solo-" podría fallar si el backend no lo soporta, pero asumimos estructura de grupo.
             await axios.patch(`${API_URL}/routines-group/${groupId}`, { 
                 nombre: name, 
                 fecha_vencimiento: dueDate 
             }, { headers: { Authorization: `Bearer ${authToken}` } });
 
-            // Actualizar cada rutina del grupo
-            for (const r of routines) {
-                await axios.patch(`${API_URL}/routines/${r.id}`, {
+            // 2. Actualizar rutinas en paralelo para mayor velocidad
+            const routinePromises = routines.map(r => 
+                axios.patch(`${API_URL}/routines/${r.id}`, {
                     nombre: r.nombre,
                     descripcion: r.descripcion,
                     exercises: r.exercises.map((ex, idx) => ({
+                        // Aseguramos que el ID del ejercicio esté presente
                         exercise_id: ex.exercise?.id || ex.exercise_id,
                         sets: parseInt(ex.sets),
                         repetitions: ex.repetitions.toString(),
@@ -271,16 +275,24 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                         notas: ex.notas || "",
                         order: idx + 1
                     }))
-                }, { headers: { Authorization: `Bearer ${authToken}` } });
-            }
-            onUpdate();
+                }, { headers: { Authorization: `Bearer ${authToken}` } })
+            );
+
+            await Promise.all(routinePromises);
+
+            // Refrescar datos y cerrar modal SOLO si todo salió bien
+            if (onUpdate) await onUpdate();
             onClose();
+
         } catch (e) {
             console.error("Error al guardar cambios:", e);
+            alert("Error al guardar los cambios. Revisa la consola o intenta nuevamente.");
         } finally {
+            // SIEMPRE apagar el loading, pase lo que pase
             setLoading(false);
         }
     };
+    // ------------------------------------------
 
     if (!isVisible) return null;
 
