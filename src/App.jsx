@@ -252,22 +252,24 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
         setLoading(true);
         try {
             const groupId = group.id.replace('group-', '');
+            // Actualizar cabecera del grupo
             await axios.patch(`${API_URL}/routines-group/${groupId}`, { 
                 nombre: name, 
                 fecha_vencimiento: dueDate 
             }, { headers: { Authorization: `Bearer ${authToken}` } });
 
+            // Actualizar cada rutina del grupo
             for (const r of routines) {
                 await axios.patch(`${API_URL}/routines/${r.id}`, {
                     nombre: r.nombre,
                     descripcion: r.descripcion,
-                    exercises: r.exercises.map(ex => ({
-                        exercise_id: ex.exercise.id,
+                    exercises: r.exercises.map((ex, idx) => ({
+                        exercise_id: ex.exercise?.id || ex.exercise_id,
                         sets: parseInt(ex.sets),
                         repetitions: ex.repetitions.toString(),
                         peso: ex.peso.toString(),
                         notas: ex.notas || "",
-                        order: ex.order
+                        order: idx + 1
                     }))
                 }, { headers: { Authorization: `Bearer ${authToken}` } });
             }
@@ -301,7 +303,6 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                         </div>
                     </div>
                     <div className="space-y-4">
-                        <p className="text-[#3ABFBC] font-black uppercase text-[10px] tracking-widest border-b border-gray-800 pb-2 italic text-left">Contenido del Entrenamiento</p>
                         {routines.map((r, rIdx) => (
                             <div key={r.id} className="bg-black/40 border border-gray-800 rounded-2xl overflow-hidden">
                                 <button onClick={() => setExpandedIdx(expandedIdx === rIdx ? null : rIdx)} className="w-full p-4 flex justify-between items-center hover:bg-white/5 transition-colors">
@@ -324,7 +325,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                         </div>
                                         {r.exercises.map((ex, eIdx) => (
                                             <div key={eIdx} className="bg-[#1C1C1E] p-4 rounded-xl border border-gray-800 shadow-inner">
-                                                <p className="text-[#3ABFBC] font-black uppercase text-[11px] mb-3 italic">{ex.exercise.nombre}</p>
+                                                <p className="text-[#3ABFBC] font-black uppercase text-[11px] mb-3 italic">{ex.exercise?.nombre || "Ejercicio"}</p>
                                                 <div className="grid grid-cols-3 gap-2 mb-3">
                                                     <div>
                                                         <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block">Sets</label>
@@ -629,6 +630,10 @@ const ProfessorDashboard = ({ navigate }) => {
     const startIndex = (currentPage - 1) * studentsPerPage;
     const paginatedStudents = filtered.slice(startIndex, startIndex + studentsPerPage);
 
+    // Cálculos para el contador solicitado
+    const currentEnd = Math.min(startIndex + paginatedStudents.length, filtered.length);
+    const paginationLabel = filtered.length > 0 ? `${startIndex + 1}-${currentEnd} / ${filtered.length} alumnos` : "0 alumnos";
+
     useEffect(() => {
         setCurrentPage(1);
     }, [search]);
@@ -663,28 +668,26 @@ const ProfessorDashboard = ({ navigate }) => {
                         <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
                     </div>
 
-                    {totalPages > 1 && (
-                        <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
-                            <button 
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
-                                className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
-                            >
-                                <ChevronLeft size={20} />
-                            </button>
-                            <div className="px-2 text-center min-w-[60px]">
-                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block leading-none mb-1">Página</span>
-                                <span className="text-white font-black italic text-sm tabular-nums">{currentPage} / {totalPages}</span>
-                            </div>
-                            <button 
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
-                                className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
-                            >
-                                <ChevronRight size={20} />
-                            </button>
+                    <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
+                        <button 
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
+                        <div className="px-2 text-center min-w-[100px]">
+                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block leading-none mb-1">Paginado</span>
+                            <span className="text-white font-black italic text-[11px] tabular-nums whitespace-nowrap">{paginationLabel}</span>
                         </div>
-                    )}
+                        <button 
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages || totalPages === 0}
+                            className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
+                        >
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
                 </div>
 
                 {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
@@ -1138,7 +1141,6 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
         setRoutines(next);
     };
 
-    // Lógica de Reordenamiento (Drag and Drop / Flechas)
     const moveExercise = (dayIdx, fromIdx, toIdx) => {
         if (toIdx < 0 || toIdx >= routines[dayIdx].exercises.length) return;
         const next = [...routines];
@@ -1285,7 +1287,6 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
     const [isCreating, setIsCreating] = useState(false);
     const [loadingCreate, setLoadingCreate] = useState(false);
     
-    // Reset de filtros cuando se abre el modal
     useEffect(() => {
         if (isVisible) {
             setSearch('');
