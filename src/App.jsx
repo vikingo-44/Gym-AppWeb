@@ -6,7 +6,8 @@ import {
     RefreshCcw, Key, Save, PlusCircle, Trash2, Zap, Calendar, List,
     Dumbbell, Filter, Minus, Info, ShieldCheck, AlertCircle, PlusSquare, Settings, History,
     Check, XCircle as XIcon, ChevronDown, ChevronUp, ClipboardList, Target, Sparkles, Layout,
-    MessageSquare, AlignLeft, Edit3, Target as TargetIcon, ChevronLeft, Fingerprint, Shield
+    MessageSquare, AlignLeft, Edit3, Target as TargetIcon, ChevronLeft, Fingerprint, Shield,
+    GripVertical
 } from 'lucide-react';
 
 // ----------------------------------------------------------------------
@@ -783,7 +784,7 @@ const StudentDashboard = ({ navigate }) => {
             </header>
 
             <main className="p-4 flex-1">
-                <div className="max-w-4xl mx-auto w-full"> {/* MODIFICADO: Ancho reducido para vista de rutina */}
+                <div className="max-w-4xl mx-auto w-full">
                     <h3 className="text-white font-black italic uppercase tracking-tighter text-xl mb-6 border-l-4 border-[#3ABFBC] pl-3 text-left">MI PLAN DE ENTRENAMIENTO</h3>
                     
                     {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
@@ -919,7 +920,7 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
 
     return (
         <div className="flex flex-col p-4 text-left flex-1">
-            <div className="max-w-4xl mx-auto w-full flex flex-col flex-1"> {/* MODIFICADO: Ancho reducido para historial */}
+            <div className="max-w-4xl mx-auto w-full flex flex-col flex-1">
                 <EditGroupModal isVisible={editModalVisible} group={selectedGroupToEdit} onClose={() => setEditModalVisible(false)} onUpdate={fetchAssignments} />
                 
                 <header className="mb-6 text-left">
@@ -1137,6 +1138,33 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
         setRoutines(next);
     };
 
+    // Lógica de Reordenamiento (Drag and Drop / Flechas)
+    const moveExercise = (dayIdx, fromIdx, toIdx) => {
+        if (toIdx < 0 || toIdx >= routines[dayIdx].exercises.length) return;
+        const next = [...routines];
+        const currentDay = { ...next[dayIdx] };
+        const exercises = [...currentDay.exercises];
+        const [movedItem] = exercises.splice(fromIdx, 1);
+        exercises.splice(toIdx, 0, movedItem);
+        currentDay.exercises = exercises;
+        next[dayIdx] = currentDay;
+        setRoutines(next);
+    };
+
+    const handleDragStart = (e, dayIdx, exIdx) => {
+        e.dataTransfer.setData("dayIdx", dayIdx);
+        e.dataTransfer.setData("exIdx", exIdx);
+    };
+
+    const handleDrop = (e, targetDayIdx, targetExIdx) => {
+        const sourceDayIdx = parseInt(e.dataTransfer.getData("dayIdx"));
+        const sourceExIdx = parseInt(e.dataTransfer.getData("exIdx"));
+        
+        if (sourceDayIdx === targetDayIdx && sourceExIdx !== targetExIdx) {
+            moveExercise(targetDayIdx, sourceExIdx, targetExIdx);
+        }
+    };
+
     const handleFinalSubmit = async () => {
         if (!groupData.name || !groupData.due_date) return;
         setIsSaving(true);
@@ -1197,14 +1225,31 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
                                 </div>
                                 <div className="space-y-4 text-left">
                                     {day.exercises.map((ex, eIdx) => (
-                                        <div key={eIdx} className="bg-black/50 p-5 rounded-2xl border border-gray-800 relative shadow-inner text-left group">
-                                            <div className="flex justify-between items-center mb-4"><p className="text-white font-black uppercase text-sm italic tracking-widest group-hover:text-[#3ABFBC] transition-colors">{ex.nombre}</p><button onClick={() => {
-                                                const n = [...routines]; 
-                                                const updatedDay = { ...n[dIdx] };
-                                                updatedDay.exercises = updatedDay.exercises.filter((_, idx) => idx !== eIdx);
-                                                n[dIdx] = updatedDay;
-                                                setRoutines(n);
-                                            }} className="text-red-500 hover:text-red-400 active:scale-90 transition-all"><Trash2 size={20} strokeWidth={2.5}/></button></div>
+                                        <div 
+                                            key={eIdx} 
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, dIdx, eIdx)}
+                                            onDragOver={(e) => e.preventDefault()}
+                                            onDrop={(e) => handleDrop(e, dIdx, eIdx)}
+                                            className="bg-black/50 p-5 rounded-2xl border border-gray-800 relative shadow-inner text-left group cursor-move hover:border-[#3ABFBC]/50 transition-colors"
+                                        >
+                                            <div className="flex justify-between items-center mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <GripVertical size={18} className="text-gray-600 group-hover:text-[#3ABFBC]" />
+                                                    <p className="text-white font-black uppercase text-sm italic tracking-widest group-hover:text-[#3ABFBC] transition-colors">{ex.nombre}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => moveExercise(dIdx, eIdx, eIdx - 1)} className="text-gray-600 hover:text-[#3ABFBC] p-1"><ChevronUp size={20}/></button>
+                                                    <button onClick={() => moveExercise(dIdx, eIdx, eIdx + 1)} className="text-gray-600 hover:text-[#3ABFBC] p-1"><ChevronDown size={20}/></button>
+                                                    <button onClick={() => {
+                                                        const n = [...routines]; 
+                                                        const updatedDay = { ...n[dIdx] };
+                                                        updatedDay.exercises = updatedDay.exercises.filter((_, idx) => idx !== eIdx);
+                                                        n[dIdx] = updatedDay;
+                                                        setRoutines(n);
+                                                    }} className="ml-2 text-red-500 hover:text-red-400 active:scale-90 transition-all"><Trash2 size={20} strokeWidth={2.5}/></button>
+                                                </div>
+                                            </div>
                                             <div className="grid grid-cols-3 gap-3 mb-4 text-left">
                                                 <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Sets</label><input type="number" value={ex.sets} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], sets:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
                                                 <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Reps</label><input type="text" value={ex.repetitions} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], repetitions:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
@@ -1240,6 +1285,15 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
     const [isCreating, setIsCreating] = useState(false);
     const [loadingCreate, setLoadingCreate] = useState(false);
     
+    // Reset de filtros cuando se abre el modal
+    useEffect(() => {
+        if (isVisible) {
+            setSearch('');
+            setFilterMuscle('Todos');
+            setIsCreating(false);
+        }
+    }, [isVisible]);
+
     if (!isVisible) return null;
 
     const muscleGroups = ['Todos', 'Pectoral', 'Espalda', 'Piernas', 'Hombro', 'Brazos', 'Abdomen', 'Gluteos', 'Cardio'];
@@ -1414,6 +1468,11 @@ const AppWrapper = () => (
             
             .shadow-inner {
                 box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.5);
+            }
+
+            [draggable="true"] {
+                user-select: none;
+                -webkit-user-drag: element;
             }
         `}</style>
     </AuthProvider>
