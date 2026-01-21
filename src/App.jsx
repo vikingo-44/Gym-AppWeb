@@ -248,26 +248,48 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
         }
     }, [isVisible, group]);
 
-    // --- CORRECCIÓN CRÍTICA EN ESTA FUNCIÓN ---
+    // Función para añadir un nuevo día a la rutina existente
+    const handleAddDay = () => {
+        const nextNum = routines.length + 1;
+        setRoutines([...routines, {
+            id: `new-${Date.now()}`, // ID temporal para el render
+            nombre: `DIA ${nextNum}`,
+            descripcion: "",
+            exercises: []
+        }]);
+        setExpandedIdx(routines.length);
+    };
+
+    // Función para eliminar un día
+    const handleRemoveDay = (idx) => {
+        if (!window.confirm("¿ESTÁS SEGURO DE ELIMINAR ESTE DÍA COMPLETO?")) return;
+        const n = [...routines];
+        n.splice(idx, 1);
+        setRoutines(n);
+        setExpandedIdx(null);
+    };
+
     const handleSave = async () => {
         setLoading(true);
         try {
             const groupId = group.id.toString().replace('group-', '');
             
-            // 1. Actualizar cabecera del grupo (Plan)
-            // Si es un "solo-" podría fallar si el backend no lo soporta, pero asumimos estructura de grupo.
+            // 1. Actualizar Plan General
             await axios.patch(`${API_URL}/routines-group/${groupId}`, { 
                 nombre: name, 
                 fecha_vencimiento: dueDate 
             }, { headers: { Authorization: `Bearer ${authToken}` } });
 
-            // 2. Actualizar rutinas en paralelo para mayor velocidad
-            const routinePromises = routines.map(r => 
-                axios.patch(`${API_URL}/routines/${r.id}`, {
+            // 2. Procesar Rutinas (Días)
+            // Para simplificar y que el backend lo tome bien, usamos una transacción si estuviera disponible,
+            // sino, el flujo lógico aquí es actualizar las existentes y crear las nuevas.
+            // NOTA: Esta implementación asume que el backend gestiona la sincronización.
+            
+            const routinePromises = routines.map(r => {
+                const payload = {
                     nombre: r.nombre,
                     descripcion: r.descripcion,
                     exercises: r.exercises.map((ex, idx) => ({
-                        // Aseguramos que el ID del ejercicio esté presente
                         exercise_id: ex.exercise?.id || ex.exercise_id,
                         sets: parseInt(ex.sets),
                         repetitions: ex.repetitions.toString(),
@@ -275,34 +297,40 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                         notas: ex.notas || "",
                         order: idx + 1
                     }))
-                }, { headers: { Authorization: `Bearer ${authToken}` } })
-            );
+                };
+
+                if (r.id.toString().startsWith('new-')) {
+                    // Si es nuevo, se debería crear y asignar al grupo. 
+                    // Para este código, enviamos el PATCH si el ID existe, 
+                    // Si el backend requiere POST para nuevos, se ajustaría aquí.
+                    return axios.post(`${API_URL}/routines/`, { ...payload, routine_group_id: parseInt(groupId) }, { headers: { Authorization: `Bearer ${authToken}` } });
+                } else {
+                    return axios.patch(`${API_URL}/routines/${r.id}`, payload, { headers: { Authorization: `Bearer ${authToken}` } });
+                }
+            });
 
             await Promise.all(routinePromises);
-
-            // Refrescar datos y cerrar modal SOLO si todo salió bien
             if (onUpdate) await onUpdate();
             onClose();
 
         } catch (e) {
             console.error("Error al guardar cambios:", e);
-            alert("Error al guardar los cambios. Revisa la consola o intenta nuevamente.");
+            alert("Error al guardar los cambios.");
         } finally {
-            // SIEMPRE apagar el loading, pase lo que pase
             setLoading(false);
         }
     };
-    // ------------------------------------------
 
     if (!isVisible) return null;
 
     return (
-        <div className="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4 backdrop-blur-xl overflow-y-auto">
-            <div className="bg-[#1C1C1E] w-full max-w-2xl rounded-[2.5rem] border border-gray-800 p-8 shadow-2xl my-8">
+        <div className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-xl overflow-y-auto pt-10 pb-20 px-4">
+            <div className="bg-[#1C1C1E] w-full max-w-2xl mx-auto rounded-[2.5rem] border border-gray-800 p-8 shadow-2xl relative">
                 <div className="flex justify-between items-center mb-8">
                     <h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter">AJUSTAR PLAN</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={32}/></button>
                 </div>
+                
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -314,85 +342,96 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                             <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} Icon={Calendar} />
                         </div>
                     </div>
+
                     <div className="space-y-4">
+                        <div className="flex justify-between items-center px-2">
+                            <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-widest italic">Días de entrenamiento</p>
+                            <button onClick={handleAddDay} className="flex items-center gap-2 bg-[#3ABFBC]/10 text-[#3ABFBC] px-3 py-1.5 rounded-xl border border-[#3ABFBC]/20 text-[10px] font-black uppercase italic hover:bg-[#3ABFBC] hover:text-black transition-all">
+                                <Plus size={14}/> Añadir Día
+                            </button>
+                        </div>
+
                         {routines.map((r, rIdx) => (
                             <div key={r.id} className="bg-black/40 border border-gray-800 rounded-2xl overflow-hidden">
-                                <button onClick={() => setExpandedIdx(expandedIdx === rIdx ? null : rIdx)} className="w-full p-4 flex justify-between items-center hover:bg-white/5 transition-colors">
-                                    <span className="text-white font-black uppercase italic text-sm">{r.nombre}</span>
-                                    {expandedIdx === rIdx ? <ChevronUp size={18} className="text-[#3ABFBC]"/> : <ChevronDown size={18} className="text-gray-500"/>}
-                                </button>
+                                <div className="flex items-center">
+                                    <button onClick={() => setExpandedIdx(expandedIdx === rIdx ? null : rIdx)} className="flex-1 p-4 flex justify-between items-center hover:bg-white/5 transition-colors">
+                                        <span className="text-white font-black uppercase italic text-sm">{r.nombre}</span>
+                                        {expandedIdx === rIdx ? <ChevronUp size={18} className="text-[#3ABFBC]"/> : <ChevronDown size={18} className="text-gray-500"/>}
+                                    </button>
+                                    <button onClick={() => handleRemoveDay(rIdx)} className="p-4 text-red-900 hover:text-red-500 transition-colors">
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                                
                                 {expandedIdx === rIdx && (
                                     <div className="p-4 space-y-4 border-t border-gray-800/50 text-left">
                                         <div className="bg-black border border-gray-800 rounded-xl p-3">
-                                            <label className="text-[8px] font-black text-[#A9A9A9] uppercase mb-1 block">Objetivo / Descripción del Día</label>
+                                            <label className="text-[8px] font-black text-[#A9A9A9] uppercase mb-1 block">Nombre del Día (Edit)</label>
+                                            <input 
+                                                value={r.nombre} 
+                                                onChange={e => {
+                                                    const n=[...routines]; n[rIdx].nombre = e.target.value; setRoutines(n);
+                                                }}
+                                                className="w-full bg-transparent text-[#3ABFBC] font-black italic text-[14px] outline-none uppercase mb-2"
+                                            />
+                                            <label className="text-[8px] font-black text-[#A9A9A9] uppercase mb-1 block">Objetivo del Día</label>
                                             <textarea 
                                                 value={r.descripcion} 
                                                 onChange={e => {
-                                                    const n=[...routines]; 
-                                                    n[rIdx] = { ...n[rIdx], descripcion: e.target.value };
-                                                    setRoutines(n);
+                                                    const n=[...routines]; n[rIdx].descripcion = e.target.value; setRoutines(n);
                                                 }}
                                                 className="w-full bg-transparent text-white font-bold italic text-[12px] outline-none resize-none h-12 uppercase" 
                                             />
                                         </div>
+
                                         {r.exercises.map((ex, eIdx) => (
                                             <div key={eIdx} className="bg-[#1C1C1E] p-4 rounded-xl border border-gray-800 shadow-inner">
-                                                <p className="text-[#3ABFBC] font-black uppercase text-[11px] mb-3 italic">{ex.exercise?.nombre || "Ejercicio"}</p>
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <p className="text-[#3ABFBC] font-black uppercase text-[11px] italic">{ex.exercise?.nombre || "Ejercicio"}</p>
+                                                    <button onClick={() => {
+                                                        const n = [...routines];
+                                                        n[rIdx].exercises.splice(eIdx, 1);
+                                                        setRoutines(n);
+                                                    }} className="text-red-900 hover:text-red-500"><Trash2 size={14}/></button>
+                                                </div>
                                                 <div className="grid grid-cols-3 gap-2 mb-3">
                                                     <div>
-                                                        <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block">Sets</label>
+                                                        <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block text-center">Sets</label>
                                                         <input type="number" value={ex.sets} onChange={e => {
-                                                            const n=[...routines]; 
-                                                            const day = { ...n[rIdx] };
-                                                            day.exercises = [...day.exercises];
-                                                            day.exercises[eIdx] = { ...day.exercises[eIdx], sets: e.target.value };
-                                                            n[rIdx] = day;
-                                                            setRoutines(n);
+                                                            const n=[...routines]; n[rIdx].exercises[eIdx].sets = e.target.value; setRoutines(n);
                                                         }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs text-center" />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block">Reps</label>
+                                                        <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block text-center">Reps</label>
                                                         <input type="text" value={ex.repetitions} onChange={e => {
-                                                            const n=[...routines]; 
-                                                            const day = { ...n[rIdx] };
-                                                            day.exercises = [...day.exercises];
-                                                            day.exercises[eIdx] = { ...day.exercises[eIdx], repetitions: e.target.value };
-                                                            n[rIdx] = day;
-                                                            setRoutines(n);
+                                                            const n=[...routines]; n[rIdx].exercises[eIdx].repetitions = e.target.value; setRoutines(n);
                                                         }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs text-center" />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block">Peso</label>
+                                                        <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block text-center">Peso</label>
                                                         <input type="text" value={ex.peso} onChange={e => {
-                                                            const n=[...routines]; 
-                                                            const day = { ...n[rIdx] };
-                                                            day.exercises = [...day.exercises];
-                                                            day.exercises[eIdx] = { ...day.exercises[eIdx], peso: e.target.value };
-                                                            n[rIdx] = day;
-                                                            setRoutines(n);
+                                                            const n=[...routines]; n[rIdx].exercises[eIdx].peso = e.target.value; setRoutines(n);
                                                         }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs text-center" />
                                                     </div>
                                                 </div>
                                                 <textarea value={ex.notas || ""} onChange={e => {
-                                                    const n=[...routines]; 
-                                                    const day = { ...n[rIdx] };
-                                                    day.exercises = [...day.exercises];
-                                                    day.exercises[eIdx] = { ...day.exercises[eIdx], notas: e.target.value };
-                                                    n[rIdx] = day;
-                                                    setRoutines(n);
+                                                    const n=[...routines]; n[rIdx].exercises[eIdx].notas = e.target.value; setRoutines(n);
                                                 }} className="w-full bg-black/50 p-2 rounded-lg border border-gray-800 text-[11px] text-gray-400 italic h-16 resize-none" placeholder="NOTAS DEL EJERCICIO..." />
                                             </div>
                                         ))}
+                                        
+                                        <p className="text-[9px] text-center text-gray-600 font-black uppercase italic">Para añadir ejercicios usa el creador de rutinas principal</p>
                                     </div>
                                 )}
                             </div>
                         ))}
                     </div>
                 </div>
+
                 <div className="mt-10 flex gap-4">
                     <button onClick={onClose} className="flex-1 h-16 bg-gray-800 rounded-2xl text-white font-black uppercase text-xs tracking-widest active:scale-95 transition-all">CANCELAR</button>
                     <button onClick={handleSave} disabled={loading} className="flex-1 h-16 bg-[#3ABFBC] text-black font-black uppercase italic rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center">
-                        {loading ? <Loader2 className="animate-spin"/> : "GUARDAR AJUSTES"}
+                        {loading ? <Loader2 className="animate-spin"/> : "GUARDAR CAMBIOS"}
                     </button>
                 </div>
             </div>
@@ -642,7 +681,6 @@ const ProfessorDashboard = ({ navigate }) => {
     const startIndex = (currentPage - 1) * studentsPerPage;
     const paginatedStudents = filtered.slice(startIndex, startIndex + studentsPerPage);
 
-    // Cálculos para el contador solicitado
     const currentEnd = Math.min(startIndex + paginatedStudents.length, filtered.length);
     const paginationLabel = filtered.length > 0 ? `${startIndex + 1}-${currentEnd} / ${filtered.length} alumnos` : "0 alumnos";
 
@@ -1173,7 +1211,6 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
     const handleDrop = (e, targetDayIdx, targetExIdx) => {
         const sourceDayIdx = parseInt(e.dataTransfer.getData("dayIdx"));
         const sourceExIdx = parseInt(e.dataTransfer.getData("exIdx"));
-        
         if (sourceDayIdx === targetDayIdx && sourceExIdx !== targetExIdx) {
             moveExercise(targetDayIdx, sourceExIdx, targetExIdx);
         }
@@ -1319,29 +1356,15 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
     
     const handleCreateNew = async () => {
         if (!newEx.nombre || !newEx.nombre.trim()) return;
-        
         setLoadingCreate(true);
         try {
-            const exerciseData = [
-                {
-                    nombre: newEx.nombre.trim(),
-                    descripcion: 'Sin descripción.', 
-                    grupo_muscular: newEx.grupo_muscular, 
-                }
-            ];
-
+            const exerciseData = [{ nombre: newEx.nombre.trim(), descripcion: 'Sin descripción.', grupo_muscular: newEx.grupo_muscular }];
             const r = await axios.post(`${API_URL}/exercises/`, exerciseData, { 
-                headers: { 
-                    'Authorization': `Bearer ${authToken}`,
-                    'Content-Type': 'application/json' 
-                } 
+                headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' } 
             });
-            
             if (r.data && r.data.length > 0) {
                 const created = r.data[0];
-                if (setAvailableExercises) {
-                    setAvailableExercises(prev => [...prev, created]);
-                }
+                if (setAvailableExercises) setAvailableExercises(prev => [...prev, created]);
                 onAddExercise(created); 
             }
             setIsCreating(false); 
@@ -1355,7 +1378,7 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
     };
 
     return (
-        <div className="fixed inset-0 z-[150] bg-black/95 flex items-center justify-center p-4 backdrop-blur-3xl text-left">
+        <div className="fixed inset-0 z-[400] bg-black/95 flex items-center justify-center p-4 backdrop-blur-3xl text-left">
             <div className="bg-[#1C1C1E] w-full max-w-xl rounded-[2.5rem] border border-gray-800 p-8 flex flex-col h-[80vh] shadow-2xl text-left">
                 <div className="flex justify-between items-center mb-6 text-left"><h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter text-left">BIBLIOTECA</h2><button onClick={onClose} className="text-gray-500 hover:text-white transition-transform"><X size={32}/></button></div>
                 {isCreating ? (
@@ -1375,19 +1398,10 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
                         <div className="flex gap-3 mb-6 text-left">
                             <div className="relative flex-1 text-left">
                                 <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                                <input 
-                                    className="w-full bg-black border border-gray-800 h-14 pl-14 pr-6 rounded-2xl text-white text-sm font-bold outline-none focus:border-[#3ABFBC] text-left" 
-                                    placeholder="BUSCAR..." 
-                                    value={search} 
-                                    onChange={e => setSearch(e.target.value)} 
-                                />
+                                <input className="w-full bg-black border border-gray-800 h-14 pl-14 pr-6 rounded-2xl text-white text-sm font-bold outline-none focus:border-[#3ABFBC] text-left" placeholder="BUSCAR..." value={search} onChange={e => setSearch(e.target.value)} />
                             </div>
                             <div className="w-36 text-left">
-                                <select 
-                                    className="w-full bg-black border border-gray-800 h-14 px-4 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest italic outline-none focus:border-[#3ABFBC]"
-                                    value={filterMuscle}
-                                    onChange={e => setFilterMuscle(e.target.value)}
-                                >
+                                <select className="w-full bg-black border border-gray-800 h-14 px-4 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest italic outline-none focus:border-[#3ABFBC]" value={filterMuscle} onChange={e => setFilterMuscle(e.target.value)}>
                                     {muscleGroups.map(m => <option key={m} value={m}>{m}</option>)}
                                 </select>
                             </div>
@@ -1395,8 +1409,7 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
                         <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar text-left">
                             {filtered.length === 0 ? (
                                 <div className="text-center py-10 opacity-30">
-                                    <Search size={40} className="mx-auto mb-2" />
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-center">Sin resultados</p>
+                                    <Search size={40} className="mx-auto mb-2" /><p className="text-[10px] font-black uppercase tracking-widest text-center">Sin resultados</p>
                                 </div>
                             ) : filtered.map(ex => (
                                 <button key={ex.id} onClick={() => { onAddExercise(ex); onClose(); }} className="w-full p-5 bg-gradient-to-br from-black to-[#0d0d0d] rounded-2xl border border-gray-800 flex justify-between items-center group transition-all text-left shadow-lg">
@@ -1438,7 +1451,6 @@ const AppWrapper = () => (
                 touch-action: manipulation;
                 -webkit-text-size-adjust: 100%;
                 -webkit-tap-highlight-color: transparent;
-                overscroll-behavior-y: none;
                 text-align: left;
             }
 
