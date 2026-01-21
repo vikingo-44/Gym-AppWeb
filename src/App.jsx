@@ -259,6 +259,24 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
         }
     }, [isVisible, group, authToken, API_URL]);
 
+    const handleDeleteDay = async (idx) => {
+        const dayToDelete = routines[idx];
+        if (dayToDelete.id) {
+            setLoading(true);
+            try {
+                await axios.delete(`${API_URL}/routines/${dayToDelete.id}`, { headers: { Authorization: `Bearer ${authToken}` } });
+            } catch (e) {
+                console.error("Error al eliminar día:", e);
+                setLoading(false);
+                return;
+            }
+        }
+        const next = routines.filter((_, i) => i !== idx);
+        setRoutines(next);
+        setExpandedIdx(null);
+        setLoading(false);
+    };
+
     const handleSave = async () => {
         setLoading(true);
         try {
@@ -338,10 +356,15 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                     <div className="space-y-4">
                         {routines.map((r, rIdx) => (
                             <div key={rIdx} className="bg-black/40 border border-gray-800 rounded-2xl overflow-hidden">
-                                <button onClick={() => setExpandedIdx(expandedIdx === rIdx ? null : rIdx)} className="w-full p-4 flex justify-between items-center hover:bg-white/5 transition-colors">
-                                    <span className="text-white font-black uppercase italic text-sm">{r.nombre}</span>
-                                    {expandedIdx === rIdx ? <ChevronUp size={18} className="text-[#3ABFBC]"/> : <ChevronDown size={18} className="text-gray-500"/>}
-                                </button>
+                                <div className="w-full flex items-center pr-4">
+                                    <button onClick={() => setExpandedIdx(expandedIdx === rIdx ? null : rIdx)} className="flex-1 p-4 flex justify-between items-center hover:bg-white/5 transition-colors">
+                                        <span className="text-white font-black uppercase italic text-sm">{r.nombre}</span>
+                                        {expandedIdx === rIdx ? <ChevronUp size={18} className="text-[#3ABFBC]"/> : <ChevronDown size={18} className="text-gray-500"/>}
+                                    </button>
+                                    <button onClick={() => handleDeleteDay(rIdx)} className="text-red-500 hover:text-red-400 p-2 transition-all active:scale-90">
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
                                 {expandedIdx === rIdx && (
                                     <div className="p-4 space-y-4 border-t border-gray-800/50 text-left">
                                         <div className="bg-black border border-gray-800 rounded-xl p-3">
