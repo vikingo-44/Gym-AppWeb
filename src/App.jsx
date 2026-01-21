@@ -234,6 +234,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
     const [routines, setRoutines] = useState([]);
     const [loading, setLoading] = useState(false);
     const [expandedIdx, setExpandedIdx] = useState(null);
+    const [deletedRoutineIds, setDeletedRoutineIds] = useState([]); // SEGUIMIENTO PARA BORRAR
     
     // Estados para la biblioteca de ejercicios dentro del editor
     const [isSelectorOpen, setIsSelectorOpen] = useState(false);
@@ -250,6 +251,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                 descripcion: a.routine.descripcion || "",
                 exercises: a.routine.exercise_links.map(el => ({ ...el }))
             })));
+            setDeletedRoutineIds([]); 
             
             // Cargar ejercicios por si quiere agregar nuevos
             axios.get(`${API_URL}/exercises/`, { headers: { Authorization: `Bearer ${authToken}` } })
@@ -260,17 +262,25 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
 
     const handleAddDay = () => {
         const nextNum = routines.length + 1;
-        setRoutines([...routines, {
+        const newRoutine = {
             id: `new-${Date.now()}`,
             nombre: `DIA ${nextNum}`,
             descripcion: "",
             exercises: []
-        }]);
-        setExpandedIdx(routines.length);
+        };
+        setRoutines([...routines, newRoutine]);
+        setExpandedIdx(routines.length); // EXPANDIR EL NUEVO DÍA AUTOMÁTICAMENTE
     };
 
     const handleRemoveDay = (idx) => {
         if (!window.confirm("¿ESTÁS SEGURO DE ELIMINAR ESTE DÍA COMPLETO?")) return;
+        const routineToRemove = routines[idx];
+        
+        // SI YA EXISTÍA EN DB, LO ANOTAMOS PARA BORRAR AL GUARDAR
+        if (routineToRemove.id && !routineToRemove.id.toString().startsWith('new-')) {
+            setDeletedRoutineIds([...deletedRoutineIds, routineToRemove.id]);
+        }
+
         const n = [...routines];
         n.splice(idx, 1);
         setRoutines(n);
@@ -288,13 +298,19 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                 fecha_vencimiento: dueDate 
             }, { headers: { Authorization: `Bearer ${authToken}` } });
 
-            // 2. Actualizar o Crear cada rutina (Día)
+            // 2. Borrar rutinas eliminadas de la base de datos
+            if (deletedRoutineIds.length > 0) {
+                await Promise.all(deletedRoutineIds.map(id => 
+                    axios.delete(`${API_URL}/routines/${id}`, { headers: { Authorization: `Bearer ${authToken}` } })
+                ));
+            }
+
+            // 3. Actualizar o Crear cada rutina (Día)
             const routinePromises = routines.map(r => {
                 const payload = {
                     nombre: r.nombre,
                     descripcion: r.descripcion,
                     exercises: r.exercises.map((ex, idx) => ({
-                        // CLAVE: Detectar si el ejercicio viene del backend (nested) o es nuevo de la biblioteca
                         exercise_id: ex.exercise?.id || ex.id || ex.exercise_id,
                         sets: parseInt(ex.sets) || 0,
                         repetitions: (ex.repetitions || "0").toString(),
@@ -353,12 +369,12 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
             />
 
             <div className="bg-[#1C1C1E] w-full max-w-2xl mx-auto rounded-[2.5rem] border border-gray-800 p-8 shadow-2xl relative">
-                <div className="flex justify-between items-center mb-8">
+                <div className="flex justify-between items-center mb-8 text-left">
                     <h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter">AJUSTAR PLAN</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors"><X size={32}/></button>
                 </div>
                 
-                <div className="space-y-6">
+                <div className="space-y-6 text-left">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-1 block">Nombre del Plan</label>
@@ -447,7 +463,6 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                             </div>
                                         ))}
                                         
-                                        {/* BOTÓN PARA AÑADIR EJERCICIOS A ESTE DÍA ESPECÍFICO */}
                                         <button 
                                             onClick={() => { setCurrentDayIdx(rIdx); setIsSelectorOpen(true); }}
                                             className="w-full border-2 border-dashed border-gray-800 h-14 rounded-2xl text-gray-500 font-black uppercase text-[9px] tracking-widest mt-2 flex items-center justify-center gap-2 hover:border-[#3ABFBC] hover:text-[#3ABFBC] transition-all"
@@ -567,17 +582,17 @@ const ResetPasswordModal = ({ isVisible, onClose, targetUser, mode = 'profile' }
     return (
         <div className="fixed inset-0 z-[210] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-[#1C1C1E] w-full max-sm:w-[95%] max-w-sm rounded-[2rem] border border-gray-800 p-8 shadow-2xl text-left">
-                <div className="text-center mb-6">
+                <div className="text-center mb-6 text-left">
                     <Key size={32} strokeWidth={2.5} className="text-amber-500 mx-auto mb-2" />
                     <h2 className="text-xl font-black italic text-white uppercase tracking-tighter">SEGURIDAD</h2>
                     <p className="text-[10px] text-[#A9A9A9] font-black uppercase tracking-widest mt-1.5 italic">CAMBIAR CONTRASEÑA</p>
                 </div>
                 {msg.text && <div className={`mb-4 p-3 rounded-xl text-[10px] font-black text-center uppercase tracking-widest ${msg.type === 'error' ? 'bg-red-900/40 text-red-500 border border-red-500/50' : 'bg-[#3ABFBC]/20 text-[#3ABFBC] border border-[#3ABFBC]/50'}`}>{msg.text}</div>}
-                <div className="space-y-1">
+                <div className="space-y-1 text-left">
                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-1 block tracking-widest">Clave Actual</label>
                     <Input placeholder="CLAVE ACTUAL" Icon={Lock} value={oldPass} onChange={e => setOldPass(e.target.value)} isPassword />
                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mt-4 mb-1 block tracking-widest">Nueva Clave</label>
-                    <Input placeholder="NUEVA CLAVE" Icon={Zap} value={newPass} onChange={e => setNewPass(e.target.value)} isPassword />
+                    <Input placeholder="NUEVA CLAVE" Icon={Lock} value={newPass} onChange={e => setNewPass(e.target.value)} isPassword />
                     <Input placeholder="REPETIR CLAVE" Icon={CheckCircle} value={confirm} onChange={e => setConfirm(e.target.value)} isPassword />
                 </div>
                 <div className="flex gap-3 mt-6">
@@ -758,9 +773,9 @@ const ProfessorDashboard = ({ navigate }) => {
 
             <main className="p-4 flex-1">
                 <div className="max-w-2xl mx-auto flex flex-col md:flex-row items-center gap-4 mb-8">
-                    <div className="relative flex-1 w-full">
+                    <div className="relative flex-1 w-full text-left">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
-                        <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
+                        <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner text-left" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
                     </div>
 
                     <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
@@ -804,14 +819,14 @@ const ProfessorDashboard = ({ navigate }) => {
                                     <Trash2 size={16} />
                                 </button>
 
-                                <div className="flex items-center mb-6 relative z-10">
+                                <div className="flex items-center mb-6 relative z-10 text-left">
                                     <div className="w-12 h-12 rounded-2xl bg-[#3ABFBC] flex items-center justify-center mr-4 shadow-lg shrink-0"><User size={24} color="black" /></div>
-                                    <div className="min-w-0 flex-1 overflow-hidden">
+                                    <div className="min-w-0 flex-1 overflow-hidden text-left">
                                         <h3 className="text-sm font-black italic text-white uppercase truncate text-left">{s.nombre}</h3>
                                         <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate text-left">{s.email}</p>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-4 gap-2 relative z-10">
+                                <div className="grid grid-cols-4 gap-2 relative z-10 text-center">
                                     <button onClick={() => { setSelectedStudent(s); setShowInfo(true); }} className="flex flex-col items-center justify-center py-3 bg-black/60 border border-gray-800 rounded-2xl text-white hover:bg-white hover:text-black active:scale-95 transition-all shadow-sm">
                                         <span className="text-[7px] font-black mt-1 uppercase text-center flex flex-col items-center"><Info size={16} strokeWidth={2.5}/> Info</span>
                                     </button>
@@ -891,7 +906,7 @@ const StudentDashboard = ({ navigate }) => {
             </header>
 
             <main className="p-4 flex-1">
-                <div className="max-w-4xl mx-auto w-full">
+                <div className="max-w-4xl mx-auto w-full text-left">
                     <h3 className="text-white font-black italic uppercase tracking-tighter text-xl mb-6 border-l-4 border-[#3ABFBC] pl-3 text-left">MI PLAN DE ENTRENAMIENTO</h3>
                     
                     {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
@@ -907,8 +922,8 @@ const StudentDashboard = ({ navigate }) => {
                                         <div className="flex-1 min-w-0 pr-4 text-left">
                                             <h3 className="text-2xl font-black italic uppercase text-[#3ABFBC] tracking-tighter leading-none mb-3 truncate text-left">{group.name}</h3>
                                             <div className="space-y-1.5 text-left">
-                                                <div className="flex items-center gap-2"><Calendar size={14} className="text-[#3ABFBC]"/><p className="text-[12px] text-white font-black uppercase italic leading-none">VENCE: {formatDisplayDate(group.due_date)}</p></div>
-                                                <div className="flex items-center gap-2"><User size={14} className="text-amber-500"/><p className="text-[12px] text-[#A9A9A9] font-black uppercase italic leading-none">{group.professor_name}</p></div>
+                                                <div className="flex items-center gap-2"><Calendar size={14} className="text-[#3ABFBC]"/><p className="text-[12px] text-white font-black uppercase italic leading-none text-left">VENCE: {formatDisplayDate(group.due_date)}</p></div>
+                                                <div className="flex items-center gap-2 text-left"><User size={14} className="text-amber-500"/><p className="text-[12px] text-[#A9A9A9] font-black uppercase italic leading-none text-left">{group.professor_name}</p></div>
                                             </div>
                                         </div>
                                         <div className="bg-white/10 w-12 h-12 rounded-2xl flex items-center justify-center border border-gray-700 shadow-inner">
@@ -916,7 +931,7 @@ const StudentDashboard = ({ navigate }) => {
                                         </div>
                                     </div>
                                     {expandedGroup === group.id && (
-                                        <div className="bg-black/40 border-t border-gray-800/50 p-4 space-y-4 animate-in slide-in-from-top-2">
+                                        <div className="bg-black/40 border-t border-gray-800/50 p-4 space-y-4 animate-in slide-in-from-top-2 text-left">
                                             {group.items.map(a => (
                                                 <div key={a.id} className="bg-[#1C1C1E]/90 border border-gray-800 rounded-3xl overflow-hidden shadow-lg">
                                                     <button onClick={() => setExpandedRoutine(expandedRoutine === a.id ? null : a.id)} className="w-full p-5 flex justify-between items-center hover:bg-white/5 transition-colors">
@@ -943,7 +958,7 @@ const StudentDashboard = ({ navigate }) => {
                                                                 <div key={i} className="bg-gradient-to-br from-[#1C1C1E] to-black border border-gray-800 p-5 rounded-[1.5rem] shadow-sm text-left">
                                                                     <div className="flex flex-col gap-3 text-left">
                                                                         <span className="text-xl text-white font-black italic uppercase tracking-tighter leading-none text-left">{link.exercise?.nombre}</span>
-                                                                        <div className="flex gap-2">
+                                                                        <div className="flex gap-2 text-center">
                                                                             <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center"><p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none">Series</p><p className="text-[#3ABFBC] font-black text-sm leading-none">{link.sets}</p></div>
                                                                             <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center"><p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none">Repeticiones</p><p className="text-[#3ABFBC] font-black text-sm leading-none">{link.repetitions}</p></div>
                                                                             {link.peso && link.peso !== "0" && <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center"><p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none">Peso / Carga</p><p className="text-amber-500 font-black text-sm leading-none">{link.peso}kg</p></div>}
@@ -1027,7 +1042,7 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
 
     return (
         <div className="flex flex-col p-4 text-left flex-1">
-            <div className="max-w-4xl mx-auto w-full flex flex-col flex-1">
+            <div className="max-w-4xl mx-auto w-full flex flex-col flex-1 text-left">
                 <EditGroupModal isVisible={editModalVisible} group={selectedGroupToEdit} onClose={() => setEditModalVisible(false)} onUpdate={fetchAssignments} />
                 
                 <header className="mb-6 text-left">
@@ -1057,7 +1072,7 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
                                     <div className="flex flex-col gap-3 items-end shrink-0">
                                         <div className="flex gap-2">
                                             <button onClick={(e) => { e.stopPropagation(); setSelectedGroupToEdit(group); setEditModalVisible(true); }} className="w-12 h-12 bg-gray-800 rounded-2xl flex items-center justify-center text-[#3ABFBC] border border-gray-700 shadow-lg"><Edit3 size={20} /></button>
-                                            <button onClick={(e) => { e.stopPropagation(); handleToggleGroupActive(group); }} disabled={updating} className={`px-5 py-3 h-12 rounded-xl text-[10px] font-black uppercase italic shadow-lg flex items-center gap-2 transition-all ${group.is_active ? 'bg-red-600 text-white' : 'bg-[#3ABFBC]'}`}>
+                                            <button onClick={(e) => { e.stopPropagation(); handleToggleGroupActive(group); }} disabled={updating} className={`px-5 py-3 h-12 rounded-xl text-[10px] font-black uppercase italic shadow-lg flex items-center gap-2 transition-all ${group.is_active ? 'bg-red-600 text-white' : 'bg-[#3ABFBC] text-black'}`}>
                                                 {updating ? <Loader2 className="animate-spin" size={14}/> : group.is_active ? <><XIcon size={14}/> INACTIVAR</> : <><CheckCircle size={14}/> ACTIVAR</>}
                                             </button>
                                         </div>
@@ -1094,7 +1109,7 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
                                                             <div key={i} className="bg-[#1C1C1E] border border-gray-800 p-5 rounded-2xl text-left shadow-inner">
                                                                 <div className="flex flex-col gap-3 text-left">
                                                                     <span className="text-xl text-white font-black italic uppercase tracking-tighter leading-none text-left">{link.exercise?.nombre}</span>
-                                                                    <div className="flex gap-2">
+                                                                    <div className="flex gap-2 text-center">
                                                                         <div className="flex-1 bg-black border border-gray-800 py-2 rounded-lg text-center"><p className="text-[7px] text-gray-500 font-black mb-1 leading-none uppercase text-center">Series</p><p className="text-[#3ABFBC] font-black text-xs leading-none text-center">{link.sets}</p></div>
                                                                         <div className="flex-1 bg-black border border-gray-800 py-2 rounded-lg text-center"><p className="text-[7px] text-gray-500 font-black mb-1 leading-none uppercase text-center">Repeticiones</p><p className="text-[#3ABFBC] font-black text-xs leading-none text-center">{link.repetitions}</p></div>
                                                                         {link.peso && link.peso !== "0" && <div className="flex-1 bg-black border border-gray-800 py-2 rounded-lg text-center"><p className="text-[7px] text-gray-500 font-black mb-1 leading-none uppercase text-center">Peso / Carga</p><p className="text-amber-500 font-black text-xs leading-none text-center">{link.peso}kg</p></div>}
@@ -1177,7 +1192,7 @@ const App = () => {
     };
 
     return (
-        <div className="min-h-screen bg-black relative flex flex-col overflow-x-hidden">
+        <div className="min-h-screen bg-black relative flex flex-col overflow-x-hidden text-left">
             <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
                 <img 
                     src={BG_IMAGE_URL} 
@@ -1324,7 +1339,7 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
                                 <div className="mb-6 text-left">
                                     <label className="text-[10px] font-black text-[#A9A9A9] uppercase ml-2 mb-2 block tracking-widest text-left">Objetivo del día</label>
                                     <div className="flex items-start gap-3 bg-black/50 border border-gray-800 rounded-2xl p-4 focus-within:border-[#3ABFBC] transition-all text-left">
-                                        <AlignLeft size={16} className="text-gray-500 mt-1" />
+                                        <AlignLeft size={16} className="text-gray-500 mt-1 text-left" />
                                         <textarea value={day.descripcion} onChange={e => {const n = [...routines]; n[dIdx].descripcion = e.target.value; setRoutines(n);}} placeholder="EJ: ENFOQUE EN FUERZA..." rows={1} className="flex-1 bg-transparent text-[13px] text-white font-bold outline-none resize-none placeholder:opacity-50 uppercase italic text-left" />
                                     </div>
                                 </div>
@@ -1338,12 +1353,12 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
                                             onDrop={(e) => handleDrop(e, dIdx, eIdx)}
                                             className="bg-black/50 p-5 rounded-2xl border border-gray-800 relative shadow-inner text-left group cursor-move hover:border-[#3ABFBC]/50 transition-colors"
                                         >
-                                            <div className="flex justify-between items-center mb-4">
-                                                <div className="flex items-center gap-3">
+                                            <div className="flex justify-between items-center mb-4 text-left">
+                                                <div className="flex items-center gap-3 text-left">
                                                     <GripVertical size={18} className="text-gray-600 group-hover:text-[#3ABFBC]" />
-                                                    <p className="text-white font-black uppercase text-sm italic tracking-widest group-hover:text-[#3ABFBC] transition-colors">{ex.nombre}</p>
+                                                    <p className="text-white font-black uppercase text-sm italic tracking-widest group-hover:text-[#3ABFBC] transition-colors text-left">{ex.nombre}</p>
                                                 </div>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 text-left">
                                                     <button onClick={() => moveExercise(dIdx, eIdx, eIdx - 1)} className="text-gray-600 hover:text-[#3ABFBC] p-1"><ChevronUp size={20}/></button>
                                                     <button onClick={() => moveExercise(dIdx, eIdx, eIdx + 1)} className="text-gray-600 hover:text-[#3ABFBC] p-1"><ChevronDown size={20}/></button>
                                                     <button onClick={() => {
@@ -1356,13 +1371,13 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-3 gap-3 mb-4 text-left">
-                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Sets</label><input type="number" value={ex.sets} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], sets:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
-                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Reps</label><input type="text" value={ex.repetitions} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], repetitions:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
-                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Peso</label><input type="text" value={ex.peso} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], peso:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
+                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block text-center">Sets</label><input type="number" value={ex.sets} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], sets:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
+                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block text-center">Reps</label><input type="text" value={ex.repetitions} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], repetitions:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
+                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block text-center">Peso</label><input type="text" value={ex.peso} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], peso:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
                                             </div>
                                             <div className="text-left">
                                                 <label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block text-left">Indicaciones del Profesor</label>
-                                                <div className="flex items-start gap-3 bg-black border border-gray-800 rounded-xl p-3 focus-within:border-[#3ABFBC] transition-all">
+                                                <div className="flex items-start gap-3 bg-black border border-gray-800 rounded-xl p-3 focus-within:border-[#3ABFBC] transition-all text-left">
                                                     <textarea value={ex.notas} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], notas:e.target.value}; n[dIdx]=d; setRoutines(n);}} placeholder="EJ: DESCANSAR 60 SEG..." rows={1} className="flex-1 bg-transparent text-[12px] text-white font-bold outline-none resize-none placeholder:opacity-50 uppercase italic leading-none text-left" />
                                                 </div>
                                             </div>
@@ -1439,7 +1454,7 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
                     <div className="space-y-5 text-left">
                         <Input placeholder="NOMBRE" value={newEx.nombre} onChange={e => setNewEx({...newEx, nombre: e.target.value})} />
                         <label className="text-[11px] font-black text-gray-500 uppercase ml-2 mb-1 block tracking-widest text-left">Grupo Muscular</label>
-                        <select className="w-full bg-[#1C1C1E] h-14 rounded-2xl px-5 border border-gray-800 text-white font-black text-xs uppercase tracking-widest italic outline-none" value={newEx.grupo_muscular} onChange={e => setNewEx({...newEx, grupo_muscular: e.target.value})}>{muscleGroups.filter(m => m !== 'Todos').map(g => <option key={g} value={g}>{g}</option>)}</select>
+                        <select className="w-full bg-[#1C1C1E] h-14 rounded-2xl px-5 border border-gray-800 text-white font-black text-xs uppercase tracking-widest italic outline-none text-left" value={newEx.grupo_muscular} onChange={e => setNewEx({...newEx, grupo_muscular: e.target.value})}>{muscleGroups.filter(m => m !== 'Todos').map(g => <option key={g} value={g}>{g}</option>)}</select>
                         <div className="flex gap-4 pt-6 text-center">
                             <button onClick={() => setIsCreating(false)} className="flex-1 bg-gray-800 text-white h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest">CANCELAR</button>
                             <button onClick={handleCreateNew} disabled={loadingCreate} className="flex-1 bg-[#3ABFBC] text-black h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest italic flex items-center justify-center shadow-lg active:scale-95 transition-all">
@@ -1455,7 +1470,7 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
                                 <input className="w-full bg-black border border-gray-800 h-14 pl-14 pr-6 rounded-2xl text-white text-sm font-bold outline-none focus:border-[#3ABFBC] text-left" placeholder="BUSCAR..." value={search} onChange={e => setSearch(e.target.value)} />
                             </div>
                             <div className="w-36 text-left">
-                                <select className="w-full bg-black border border-gray-800 h-14 px-4 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest italic outline-none focus:border-[#3ABFBC]" value={filterMuscle} onChange={e => setFilterMuscle(e.target.value)}>
+                                <select className="w-full bg-black border border-gray-800 h-14 px-4 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest italic outline-none focus:border-[#3ABFBC] text-left" value={filterMuscle} onChange={e => setFilterMuscle(e.target.value)}>
                                     {muscleGroups.map(m => <option key={m} value={m}>{m}</option>)}
                                 </select>
                             </div>
