@@ -227,14 +227,14 @@ const PublicResetPasswordModal = ({ isVisible, onClose }) => {
     );
 };
 
-const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
-    const { authToken, API_URL } = useAuth();
+const EditGroupModal = ({ isVisible, onClose, group, onUpdate, studentId }) => {
+    const { authToken, API_URL, userData } = useAuth();
     const [name, setName] = useState('');
     const [dueDate, setDueDate] = useState('');
     const [routines, setRoutines] = useState([]);
     const [loading, setLoading] = useState(false);
     const [expandedIdx, setExpandedIdx] = useState(null);
-    const [deletedRoutineIds, setDeletedRoutineIds] = useState([]); // SEGUIMIENTO PARA BORRAR
+    const [deletedRoutineIds, setDeletedRoutineIds] = useState([]);
     
     // Estados para la biblioteca de ejercicios dentro del editor
     const [isSelectorOpen, setIsSelectorOpen] = useState(false);
@@ -251,7 +251,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                 descripcion: a.routine.descripcion || "",
                 exercises: a.routine.exercise_links.map(el => ({ ...el }))
             })));
-            setDeletedRoutineIds([]); 
+            setDeletedRoutineIds([]);
             
             // Cargar ejercicios por si quiere agregar nuevos
             axios.get(`${API_URL}/exercises/`, { headers: { Authorization: `Bearer ${authToken}` } })
@@ -262,25 +262,21 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
 
     const handleAddDay = () => {
         const nextNum = routines.length + 1;
-        const newRoutine = {
+        setRoutines([...routines, {
             id: `new-${Date.now()}`,
             nombre: `DIA ${nextNum}`,
             descripcion: "",
             exercises: []
-        };
-        setRoutines([...routines, newRoutine]);
-        setExpandedIdx(routines.length); // EXPANDIR EL NUEVO DÍA AUTOMÁTICAMENTE
+        }]);
+        setExpandedIdx(routines.length);
     };
 
     const handleRemoveDay = (idx) => {
         if (!window.confirm("¿ESTÁS SEGURO DE ELIMINAR ESTE DÍA COMPLETO?")) return;
         const routineToRemove = routines[idx];
-        
-        // SI YA EXISTÍA EN DB, LO ANOTAMOS PARA BORRAR AL GUARDAR
         if (routineToRemove.id && !routineToRemove.id.toString().startsWith('new-')) {
             setDeletedRoutineIds([...deletedRoutineIds, routineToRemove.id]);
         }
-
         const n = [...routines];
         n.splice(idx, 1);
         setRoutines(n);
@@ -298,7 +294,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                 fecha_vencimiento: dueDate 
             }, { headers: { Authorization: `Bearer ${authToken}` } });
 
-            // 2. Borrar rutinas eliminadas de la base de datos
+            // 2. Borrar rutinas (días) eliminados
             if (deletedRoutineIds.length > 0) {
                 await Promise.all(deletedRoutineIds.map(id => 
                     axios.delete(`${API_URL}/routines/${id}`, { headers: { Authorization: `Bearer ${authToken}` } })
@@ -306,7 +302,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
             }
 
             // 3. Actualizar o Crear cada rutina (Día)
-            const routinePromises = routines.map(r => {
+            const routinePromises = routines.map(async (r) => {
                 const payload = {
                     nombre: r.nombre,
                     descripcion: r.descripcion,
@@ -321,13 +317,24 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                 };
 
                 if (r.id.toString().startsWith('new-')) {
-                    // Si es un día nuevo creado en este modal
-                    return axios.post(`${API_URL}/routines/`, { 
+                    // SI ES NUEVO: CREAR RUTINA Y ASIGNAR AL ALUMNO
+                    const resRoutine = await axios.post(`${API_URL}/routines/`, { 
                         ...payload, 
                         routine_group_id: parseInt(groupId) 
                     }, { headers: { Authorization: `Bearer ${authToken}` } });
+
+                    const newRoutineId = resRoutine.data.id;
+
+                    // ESTO ES LO QUE FALTABA: CREAR LA ASIGNACIÓN PARA QUE APAREZCA EN LA APP
+                    return axios.post(`${API_URL}/assignments/`, {
+                        student_id: parseInt(studentId),
+                        routine_id: newRoutineId,
+                        professor_id: userData.id,
+                        is_active: true
+                    }, { headers: { Authorization: `Bearer ${authToken}` } });
+
                 } else {
-                    // Si es un día que ya existía
+                    // SI YA EXISTÍA: SOLO ACTUALIZAR
                     return axios.patch(`${API_URL}/routines/${r.id}`, payload, { headers: { Authorization: `Bearer ${authToken}` } });
                 }
             });
@@ -349,7 +356,6 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
     return (
         <div className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-xl overflow-y-auto pt-10 pb-20 px-4">
             
-            {/* Selector de ejercicios dentro del editor */}
             <ExerciseSelectorModal 
                 isVisible={isSelectorOpen}
                 onClose={() => setIsSelectorOpen(false)}
@@ -368,13 +374,13 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                 }}
             />
 
-            <div className="bg-[#1C1C1E] w-full max-w-2xl mx-auto rounded-[2.5rem] border border-gray-800 p-8 shadow-2xl relative">
-                <div className="flex justify-between items-center mb-8 text-left">
+            <div className="bg-[#1C1C1E] w-full max-w-2xl mx-auto rounded-[2.5rem] border border-gray-800 p-8 shadow-2xl relative text-left">
+                <div className="flex justify-between items-center mb-8">
                     <h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter">AJUSTAR PLAN</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors"><X size={32}/></button>
                 </div>
                 
-                <div className="space-y-6 text-left">
+                <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-1 block">Nombre del Plan</label>
@@ -582,17 +588,17 @@ const ResetPasswordModal = ({ isVisible, onClose, targetUser, mode = 'profile' }
     return (
         <div className="fixed inset-0 z-[210] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-[#1C1C1E] w-full max-sm:w-[95%] max-w-sm rounded-[2rem] border border-gray-800 p-8 shadow-2xl text-left">
-                <div className="text-center mb-6 text-left">
+                <div className="text-center mb-6">
                     <Key size={32} strokeWidth={2.5} className="text-amber-500 mx-auto mb-2" />
                     <h2 className="text-xl font-black italic text-white uppercase tracking-tighter">SEGURIDAD</h2>
                     <p className="text-[10px] text-[#A9A9A9] font-black uppercase tracking-widest mt-1.5 italic">CAMBIAR CONTRASEÑA</p>
                 </div>
                 {msg.text && <div className={`mb-4 p-3 rounded-xl text-[10px] font-black text-center uppercase tracking-widest ${msg.type === 'error' ? 'bg-red-900/40 text-red-500 border border-red-500/50' : 'bg-[#3ABFBC]/20 text-[#3ABFBC] border border-[#3ABFBC]/50'}`}>{msg.text}</div>}
-                <div className="space-y-1 text-left">
+                <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-1 block tracking-widest">Clave Actual</label>
                     <Input placeholder="CLAVE ACTUAL" Icon={Lock} value={oldPass} onChange={e => setOldPass(e.target.value)} isPassword />
                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mt-4 mb-1 block tracking-widest">Nueva Clave</label>
-                    <Input placeholder="NUEVA CLAVE" Icon={Lock} value={newPass} onChange={e => setNewPass(e.target.value)} isPassword />
+                    <Input placeholder="NUEVA CLAVE" Icon={Zap} value={newPass} onChange={e => setNewPass(e.target.value)} isPassword />
                     <Input placeholder="REPETIR CLAVE" Icon={CheckCircle} value={confirm} onChange={e => setConfirm(e.target.value)} isPassword />
                 </div>
                 <div className="flex gap-3 mt-6">
@@ -922,8 +928,8 @@ const StudentDashboard = ({ navigate }) => {
                                         <div className="flex-1 min-w-0 pr-4 text-left">
                                             <h3 className="text-2xl font-black italic uppercase text-[#3ABFBC] tracking-tighter leading-none mb-3 truncate text-left">{group.name}</h3>
                                             <div className="space-y-1.5 text-left">
-                                                <div className="flex items-center gap-2"><Calendar size={14} className="text-[#3ABFBC]"/><p className="text-[12px] text-white font-black uppercase italic leading-none text-left">VENCE: {formatDisplayDate(group.due_date)}</p></div>
-                                                <div className="flex items-center gap-2 text-left"><User size={14} className="text-amber-500"/><p className="text-[12px] text-[#A9A9A9] font-black uppercase italic leading-none text-left">{group.professor_name}</p></div>
+                                                <div className="flex items-center gap-2 text-left"><Calendar size={14} className="text-[#3ABFBC]"/><p className="text-[12px] text-white font-black uppercase italic leading-none text-left">VENCE: {formatDisplayDate(group.due_date)}</p></div>
+                                                <div className="flex items-center gap-2 text-left text-amber-500"><User size={14} className="text-amber-500"/><p className="text-[12px] text-[#A9A9A9] font-black uppercase italic leading-none text-left">{group.professor_name}</p></div>
                                             </div>
                                         </div>
                                         <div className="bg-white/10 w-12 h-12 rounded-2xl flex items-center justify-center border border-gray-700 shadow-inner">
@@ -958,10 +964,10 @@ const StudentDashboard = ({ navigate }) => {
                                                                 <div key={i} className="bg-gradient-to-br from-[#1C1C1E] to-black border border-gray-800 p-5 rounded-[1.5rem] shadow-sm text-left">
                                                                     <div className="flex flex-col gap-3 text-left">
                                                                         <span className="text-xl text-white font-black italic uppercase tracking-tighter leading-none text-left">{link.exercise?.nombre}</span>
-                                                                        <div className="flex gap-2 text-center">
-                                                                            <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center"><p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none">Series</p><p className="text-[#3ABFBC] font-black text-sm leading-none">{link.sets}</p></div>
-                                                                            <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center"><p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none">Repeticiones</p><p className="text-[#3ABFBC] font-black text-sm leading-none">{link.repetitions}</p></div>
-                                                                            {link.peso && link.peso !== "0" && <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center"><p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none">Peso / Carga</p><p className="text-amber-500 font-black text-sm leading-none">{link.peso}kg</p></div>}
+                                                                        <div className="flex gap-2">
+                                                                            <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center"><p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none text-center">Series</p><p className="text-[#3ABFBC] font-black text-sm leading-none text-center">{link.sets}</p></div>
+                                                                            <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center"><p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none text-center">Repeticiones</p><p className="text-[#3ABFBC] font-black text-sm leading-none text-center">{link.repetitions}</p></div>
+                                                                            {link.peso && link.peso !== "0" && <div className="flex-1 bg-white/5 border border-gray-800 py-2.5 rounded-xl text-center"><p className="text-[8px] text-gray-500 font-black uppercase mb-1 leading-none text-center">Peso / Carga</p><p className="text-amber-500 font-black text-sm leading-none text-center">{link.peso}kg</p></div>}
                                                                         </div>
                                                                         {link.notas && <div className="mt-2 bg-black/50 p-4 rounded-2xl border border-gray-800 shadow-inner text-left"><p className="text-[13px] text-gray-400 italic font-medium leading-snug text-left"><span className="text-[#3ABFBC] font-black not-italic mr-2 uppercase tracking-tighter text-[10px]">NOTAS:</span> {link.notas}</p></div>}
                                                                     </div>
@@ -1043,7 +1049,8 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
     return (
         <div className="flex flex-col p-4 text-left flex-1">
             <div className="max-w-4xl mx-auto w-full flex flex-col flex-1 text-left">
-                <EditGroupModal isVisible={editModalVisible} group={selectedGroupToEdit} onClose={() => setEditModalVisible(false)} onUpdate={fetchAssignments} />
+                {/* IMPORTANTE: PASAMOS EL studentId AL MODAL PARA LAS NUEVAS ASIGNACIONES */}
+                <EditGroupModal isVisible={editModalVisible} group={selectedGroupToEdit} studentId={studentId} onClose={() => setEditModalVisible(false)} onUpdate={fetchAssignments} />
                 
                 <header className="mb-6 text-left">
                     <button onClick={() => navigate('dashboard')} className="text-[#3ABFBC] flex items-center gap-2 font-black italic uppercase tracking-tighter mb-4 text-sm group transition-transform"><ArrowLeft size={18} strokeWidth={2.5}/> VOLVER</button>
@@ -1109,7 +1116,7 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
                                                             <div key={i} className="bg-[#1C1C1E] border border-gray-800 p-5 rounded-2xl text-left shadow-inner">
                                                                 <div className="flex flex-col gap-3 text-left">
                                                                     <span className="text-xl text-white font-black italic uppercase tracking-tighter leading-none text-left">{link.exercise?.nombre}</span>
-                                                                    <div className="flex gap-2 text-center">
+                                                                    <div className="flex gap-2">
                                                                         <div className="flex-1 bg-black border border-gray-800 py-2 rounded-lg text-center"><p className="text-[7px] text-gray-500 font-black mb-1 leading-none uppercase text-center">Series</p><p className="text-[#3ABFBC] font-black text-xs leading-none text-center">{link.sets}</p></div>
                                                                         <div className="flex-1 bg-black border border-gray-800 py-2 rounded-lg text-center"><p className="text-[7px] text-gray-500 font-black mb-1 leading-none uppercase text-center">Repeticiones</p><p className="text-[#3ABFBC] font-black text-xs leading-none text-center">{link.repetitions}</p></div>
                                                                         {link.peso && link.peso !== "0" && <div className="flex-1 bg-black border border-gray-800 py-2 rounded-lg text-center"><p className="text-[7px] text-gray-500 font-black mb-1 leading-none uppercase text-center">Peso / Carga</p><p className="text-amber-500 font-black text-xs leading-none text-center">{link.peso}kg</p></div>}
@@ -1222,7 +1229,7 @@ const AddStudentPage = ({ navigate }) => {
     };
 
     return (
-        <div className="p-6 flex flex-col items-center flex-1">
+        <div className="p-6 flex flex-col items-center flex-1 text-left">
             <header className="mb-10 max-w-lg w-full text-left">
                 <button onClick={() => navigate('dashboard')} className="text-[#3ABFBC] flex items-center gap-2 font-black italic uppercase tracking-tighter mb-8 text-sm group transition-transform"><ArrowLeft size={18} strokeWidth={2.5}/> VOLVER</button>
                 <h1 className="text-4xl font-black italic text-white tracking-tighter uppercase text-left">ALTA ALUMNO</h1>
@@ -1314,7 +1321,7 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
             <header className="mb-6 max-w-2xl mx-auto w-full text-left">
                 <button onClick={() => step > 1 ? setStep(step - 1) : navigate('dashboard')} className="text-[#3ABFBC] flex items-center gap-2 font-black italic uppercase tracking-tighter mb-4 text-xs group transition-transform"><ArrowLeft size={18} strokeWidth={2.5}/> VOLVER</button>
                 <h1 className="text-2xl font-black italic text-white tracking-tighter uppercase leading-none text-left">NUEVA RUTINA: {studentName}</h1>
-                <div className="w-full h-1.5 bg-gray-800 rounded-full mt-4 overflow-hidden shadow-inner"><div className="h-full bg-[#3ABFBC] transition-all duration-500" style={{width: `${(step/2)*100}%`}}></div></div>
+                <div className="w-full h-1.5 bg-gray-800 rounded-full mt-4 overflow-hidden shadow-inner text-left"><div className="h-full bg-[#3ABFBC] transition-all duration-500" style={{width: `${(step/2)*100}%`}}></div></div>
             </header>
             <main className="flex-1 max-w-2xl mx-auto w-full pb-10 text-left">
                 {step === 1 ? (
@@ -1449,7 +1456,7 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
     return (
         <div className="fixed inset-0 z-[400] bg-black/95 flex items-center justify-center p-4 backdrop-blur-3xl text-left">
             <div className="bg-[#1C1C1E] w-full max-w-xl rounded-[2.5rem] border border-gray-800 p-8 flex flex-col h-[80vh] shadow-2xl text-left">
-                <div className="flex justify-between items-center mb-6 text-left"><h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter text-left">BIBLIOTECA</h2><button onClick={onClose} className="text-gray-500 hover:text-white transition-transform"><X size={32}/></button></div>
+                <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter">BIBLIOTECA</h2><button onClick={onClose} className="text-gray-500 hover:text-white transition-transform"><X size={32}/></button></div>
                 {isCreating ? (
                     <div className="space-y-5 text-left">
                         <Input placeholder="NOMBRE" value={newEx.nombre} onChange={e => setNewEx({...newEx, nombre: e.target.value})} />
@@ -1457,7 +1464,7 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
                         <select className="w-full bg-[#1C1C1E] h-14 rounded-2xl px-5 border border-gray-800 text-white font-black text-xs uppercase tracking-widest italic outline-none text-left" value={newEx.grupo_muscular} onChange={e => setNewEx({...newEx, grupo_muscular: e.target.value})}>{muscleGroups.filter(m => m !== 'Todos').map(g => <option key={g} value={g}>{g}</option>)}</select>
                         <div className="flex gap-4 pt-6 text-center">
                             <button onClick={() => setIsCreating(false)} className="flex-1 bg-gray-800 text-white h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest">CANCELAR</button>
-                            <button onClick={handleCreateNew} disabled={loadingCreate} className="flex-1 bg-[#3ABFBC] text-black h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest italic flex items-center justify-center shadow-lg active:scale-95 transition-all">
+                            <button onClick={handleCreateNew} disabled={loadingCreate} className="flex-1 bg-[#3ABFBC] text-black h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest italic flex items-center justify-center shadow-lg active:scale-95 transition-all text-center">
                                 {loadingCreate ? <Loader2 className="animate-spin"/> : "CREAR"}
                             </button>
                         </div>
@@ -1492,7 +1499,7 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
                                 </button>
                             ))}
                         </div>
-                        <button onClick={() => setIsCreating(true)} className="w-full bg-[#3ABFBC]/5 border border-[#3ABFBC]/30 text-[#3ABFBC] h-16 rounded-[1.5rem] text-[10px] font-black uppercase mt-6 italic active:bg-[#3ABFBC] active:text-black flex items-center justify-center gap-3 shadow-lg"><PlusSquare size={20} strokeWidth={2.5}/> CREAR NUEVO EJERCICIO</button>
+                        <button onClick={() => setIsCreating(true)} className="w-full bg-[#3ABFBC]/5 border border-[#3ABFBC]/30 text-[#3ABFBC] h-16 rounded-[1.5rem] text-[10px] font-black uppercase mt-6 italic active:bg-[#3ABFBC] active:text-black flex items-center justify-center gap-3 shadow-lg text-center"><PlusSquare size={20} strokeWidth={2.5}/> CREAR NUEVO EJERCICIO</button>
                     </>
                 )}
             </div>
