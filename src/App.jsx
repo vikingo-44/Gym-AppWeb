@@ -236,7 +236,6 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate, studentId }) => {
     const [expandedIdx, setExpandedIdx] = useState(null);
     const [deletedRoutineIds, setDeletedRoutineIds] = useState([]);
     
-    // Estados para la biblioteca de ejercicios dentro del editor
     const [isSelectorOpen, setIsSelectorOpen] = useState(false);
     const [currentDayIdx, setCurrentDayIdx] = useState(null);
     const [availableExercises, setAvailableExercises] = useState([]);
@@ -246,8 +245,12 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate, studentId }) => {
             setName(group.name || '');
             setDueDate(group.due_date ? group.due_date.split('T')[0] : '');
             
-            // Cargamos rutinas ordenadas para editar
-            const sortedItems = [...group.items].sort((a, b) => (a.routine.id - b.routine.id));
+            // Ordenar por campo 'orden' si existe, si no por ID
+            const sortedItems = [...group.items].sort((a, b) => {
+                const ordA = a.routine.orden || a.routine.id;
+                const ordB = b.routine.orden || b.routine.id;
+                return ordA - ordB;
+            });
             
             setRoutines(sortedItems.map(a => ({
                 id: a.routine.id,
@@ -291,25 +294,25 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate, studentId }) => {
         try {
             const groupId = group.id.toString().replace('group-', '');
             
-            // 1. Actualizar datos del grupo
+            // 1. Actualizar metadatos del grupo
             await axios.patch(`${API_URL}/routines-group/${groupId}`, { 
                 nombre: name, 
                 fecha_vencimiento: dueDate 
             }, { headers: { Authorization: `Bearer ${authToken}` } });
 
-            // 2. Borrar rutinas (días) eliminados
+            // 2. Borrar rutinas eliminadas
             if (deletedRoutineIds.length > 0) {
                 await Promise.all(deletedRoutineIds.map(id => 
                     axios.delete(`${API_URL}/routines/${id}`, { headers: { Authorization: `Bearer ${authToken}` } })
                 ));
             }
 
-            // 3. Actualizar o Crear cada rutina (Día) con ORDEN explícito
+            // 3. Actualizar o Crear cada rutina con su ORDEN actual
             const routinePromises = routines.map(async (r, rIdx) => {
                 const payload = {
                     nombre: r.nombre,
                     descripcion: r.descripcion,
-                    orden: rIdx + 1, // Enviamos el orden para que no se inviertan
+                    orden: rIdx + 1, // Mantenemos el orden secuencial
                     exercises: r.exercises.map((ex, idx) => ({
                         exercise_id: ex.exercise?.id || ex.id || ex.exercise_id,
                         sets: parseInt(ex.sets) || 0,
@@ -321,22 +324,23 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate, studentId }) => {
                 };
 
                 if (r.id.toString().startsWith('new-')) {
+                    // Si es nuevo, lo creamos dentro del grupo
                     const resRoutine = await axios.post(`${API_URL}/routines/`, { 
                         ...payload, 
                         routine_group_id: parseInt(groupId) 
                     }, { headers: { Authorization: `Bearer ${authToken}` } });
 
-                    const newRoutineId = resRoutine.data.id;
-
-                    // IMPORTANTE: Al ser un día nuevo de un grupo ya existente, lo asignamos para que aparezca
+                    // Creamos la asignación individual para este nuevo día
+                    // para que el backend lo vincule al historial del alumno
                     return axios.post(`${API_URL}/assignments/`, {
                         student_id: parseInt(studentId),
-                        routine_id: newRoutineId,
+                        routine_id: resRoutine.data.id,
                         professor_id: userData.id,
                         is_active: true
                     }, { headers: { Authorization: `Bearer ${authToken}` } });
 
                 } else {
+                    // Si ya existe, simplemente actualizamos sus datos y orden
                     return axios.patch(`${API_URL}/routines/${r.id}`, payload, { headers: { Authorization: `Bearer ${authToken}` } });
                 }
             });
@@ -406,7 +410,10 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate, studentId }) => {
                             <div key={r.id} className="bg-black/40 border border-gray-800 rounded-2xl overflow-hidden">
                                 <div className="flex items-center">
                                     <button onClick={() => setExpandedIdx(expandedIdx === rIdx ? null : rIdx)} className="flex-1 p-4 flex justify-between items-center hover:bg-white/5 transition-colors">
-                                        <span className="text-white font-black uppercase italic text-sm">{r.nombre}</span>
+                                        <div className="flex items-center gap-3">
+                                            <span className="w-6 h-6 rounded bg-[#3ABFBC] text-black font-black text-[10px] flex items-center justify-center italic">{rIdx + 1}</span>
+                                            <span className="text-white font-black uppercase italic text-sm">{r.nombre}</span>
+                                        </div>
                                         {expandedIdx === rIdx ? <ChevronUp size={18} className="text-[#3ABFBC]"/> : <ChevronDown size={18} className="text-gray-500"/>}
                                     </button>
                                     <button onClick={() => handleRemoveDay(rIdx)} className="p-4 text-red-900 hover:text-red-500 transition-colors">
@@ -618,7 +625,7 @@ const ConfirmResetModal = ({ isVisible, student, password, onConfirm, onClose, l
     if (!isVisible || !student) return null;
     return (
         <div className="fixed inset-0 z-[250] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl text-center">
-            <div className="bg-[#1C1C1E] w-full max-w-sm rounded-[2.5rem] border border-gray-800 p-10 shadow-2xl animate-in zoom-in duration-300">
+            <div className="bg-[#1C1C1E] w-full max-sm:w-[95%] max-w-sm rounded-[2.5rem] border border-gray-800 p-10 shadow-2xl animate-in zoom-in duration-300">
                 <div className="bg-red-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20"><AlertCircle size={40} className="text-red-500" /></div>
                 <h2 className="text-2xl font-black italic text-white uppercase tracking-tighter mb-4 text-center">¿RESET DE CLAVE?</h2>
                 <div className="bg-black/50 p-6 rounded-3xl border border-gray-800 mb-8">
@@ -883,20 +890,27 @@ const StudentDashboard = ({ navigate }) => {
         const groupsMap = new Map();
         assignments.forEach(a => {
             const groupObj = a.routine?.routine_group;
-            const key = groupObj ? `group-${groupObj.id}` : `solo-${a.id}`;
-            const groupName = groupObj?.nombre || a.routine?.nombre || "PLAN INDIVIDUAL";
+            // Usamos el ID del grupo para la clave de agrupación, incluso si el objeto no está presente
+            const gId = groupObj?.id || a.routine?.routine_group_id;
+            const key = gId ? `group-${gId}` : `solo-${a.id}`;
+            const groupName = groupObj?.nombre || a.routine?.nombre || "PLAN DE ENTRENAMIENTO";
             const groupDue = groupObj?.fecha_vencimiento;
             const groupProf = a.professor?.nombre || "TU ENTRENADOR";
+            
             if (!groupsMap.has(key)) {
                 groupsMap.set(key, { id: key, name: groupName, due_date: groupDue, professor_name: groupProf, date: a.assigned_at, items: [] });
             }
             groupsMap.get(key).items.push(a);
         });
         
-        // ORDENAMOS los días dentro de cada grupo por ID o por un campo 'orden' si existe
         const result = Array.from(groupsMap.values());
         result.forEach(g => {
-            g.items.sort((a, b) => (a.routine.id - b.routine.id));
+            // Ordenamos los días por el campo 'orden' para que no se inviertan
+            g.items.sort((a, b) => {
+                const ordA = a.routine.orden || a.routine.id;
+                const ordB = b.routine.orden || b.routine.id;
+                return ordA - ordB;
+            });
         });
         
         return result.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -950,7 +964,10 @@ const StudentDashboard = ({ navigate }) => {
                                             {group.items.map(a => (
                                                 <div key={a.id} className="bg-[#1C1C1E]/90 border border-gray-800 rounded-3xl overflow-hidden shadow-lg">
                                                     <button onClick={() => setExpandedRoutine(expandedRoutine === a.id ? null : a.id)} className="w-full p-5 flex justify-between items-center hover:bg-white/5 transition-colors">
-                                                        <div className="text-left"><p className="text-white font-black uppercase text-lg italic leading-none text-left">{a.routine?.nombre}</p></div>
+                                                        <div className="text-left flex items-center gap-2">
+                                                            <div className="w-6 h-6 rounded bg-[#3ABFBC] text-black font-black text-[10px] flex items-center justify-center italic shrink-0">{(a.routine.orden || "?")}</div>
+                                                            <p className="text-white font-black uppercase text-lg italic leading-none text-left">{a.routine?.nombre}</p>
+                                                        </div>
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{a.routine?.exercise_links?.length || 0} EJERCICIOS</span>
                                                             <div className="w-8 h-8 rounded-lg bg-[#3ABFBC] flex items-center justify-center">
@@ -1036,8 +1053,10 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
         const groupsMap = new Map();
         assignments.forEach(a => {
             const groupObj = a.routine?.routine_group;
-            const key = groupObj ? `group-${groupObj.id}` : `solo-${a.id}`;
+            const gId = groupObj?.id || a.routine?.routine_group_id;
+            const key = gId ? `group-${gId}` : `solo-${a.id}`;
             const groupName = groupObj?.nombre || a.routine?.nombre || "PLAN INDIVIDUAL";
+            
             if (!groupsMap.has(key)) {
                 groupsMap.set(key, { 
                     id: key, 
@@ -1055,8 +1074,12 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
 
         const result = Array.from(groupsMap.values());
         result.forEach(g => {
-            // Ordenamos los días por su ID
-            g.items.sort((a, b) => (a.routine.id - b.routine.id));
+            // Ordenamos por 'orden' para mantener coherencia en el historial
+            g.items.sort((a, b) => {
+                const ordA = a.routine.orden || a.routine.id;
+                const ordB = b.routine.orden || b.routine.id;
+                return ordA - ordB;
+            });
         });
 
         return result.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -1108,7 +1131,10 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
                                         {group.items.map(a => (
                                             <div key={a.id} className="bg-[#1C1C1E]/90 border border-gray-800 rounded-3xl overflow-hidden text-left shadow-sm">
                                                 <button onClick={() => setExpandedRoutine(expandedRoutine === a.id ? null : a.id)} className="w-full p-4 flex justify-between items-center text-left">
-                                                    <p className="text-[#3ABFBC] font-black uppercase text-lg italic leading-none text-left">{a.routine?.nombre}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-5 h-5 rounded bg-[#3ABFBC] text-black font-black text-[9px] flex items-center justify-center italic shrink-0">{(a.routine.orden || "?")}</div>
+                                                        <p className="text-[#3ABFBC] font-black uppercase text-lg italic leading-none text-left">{a.routine?.nombre}</p>
+                                                    </div>
                                                     <div className="flex items-center gap-2 text-left">
                                                         <span className="text-[9px] font-black text-gray-600 uppercase text-left">{a.routine?.exercise_links?.length || 0} EJERCICIOS</span>
                                                         <div className="w-8 h-8 rounded-lg bg-white/10 border border-gray-800 flex items-center justify-center">
@@ -1315,7 +1341,7 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
             routines: routines.map((r, rIdx) => ({ 
                 nombre: r.nombre, 
                 descripcion: r.descripcion || "", 
-                orden: rIdx + 1, // Mantenemos el orden
+                orden: rIdx + 1,
                 exercises: r.exercises.map((ex, idx) => ({ 
                     exercise_id: ex.id, 
                     sets: parseInt(ex.sets) || 0, 
@@ -1482,7 +1508,7 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
 
     return (
         <div className="fixed inset-0 z-[400] bg-black/95 flex items-center justify-center p-4 backdrop-blur-3xl text-left">
-            <div className="bg-[#1C1C1E] w-full max-w-xl rounded-[2.5rem] border border-gray-800 p-8 flex flex-col h-[80vh] shadow-2xl text-left">
+            <div className="bg-[#1C1C1E] w-full max-sm:w-[95%] max-w-xl rounded-[2.5rem] border border-gray-800 p-8 flex flex-col h-[80vh] shadow-2xl text-left">
                 <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter">BIBLIOTECA</h2><button onClick={onClose} className="text-gray-500 hover:text-white transition-transform"><X size={32}/></button></div>
                 {isCreating ? (
                     <div className="space-y-5 text-left">
