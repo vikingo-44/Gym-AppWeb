@@ -245,7 +245,11 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate, studentId }) => {
         if (isVisible && group) {
             setName(group.name || '');
             setDueDate(group.due_date ? group.due_date.split('T')[0] : '');
-            setRoutines(group.items.map(a => ({
+            
+            // Cargamos rutinas ordenadas para editar
+            const sortedItems = [...group.items].sort((a, b) => (a.routine.id - b.routine.id));
+            
+            setRoutines(sortedItems.map(a => ({
                 id: a.routine.id,
                 nombre: a.routine.nombre,
                 descripcion: a.routine.descripcion || "",
@@ -253,7 +257,6 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate, studentId }) => {
             })));
             setDeletedRoutineIds([]);
             
-            // Cargar ejercicios por si quiere agregar nuevos
             axios.get(`${API_URL}/exercises/`, { headers: { Authorization: `Bearer ${authToken}` } })
                 .then(r => setAvailableExercises(r.data))
                 .catch(e => console.error(e));
@@ -301,11 +304,12 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate, studentId }) => {
                 ));
             }
 
-            // 3. Actualizar o Crear cada rutina (Día)
-            const routinePromises = routines.map(async (r) => {
+            // 3. Actualizar o Crear cada rutina (Día) con ORDEN explícito
+            const routinePromises = routines.map(async (r, rIdx) => {
                 const payload = {
                     nombre: r.nombre,
                     descripcion: r.descripcion,
+                    orden: rIdx + 1, // Enviamos el orden para que no se inviertan
                     exercises: r.exercises.map((ex, idx) => ({
                         exercise_id: ex.exercise?.id || ex.id || ex.exercise_id,
                         sets: parseInt(ex.sets) || 0,
@@ -317,7 +321,6 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate, studentId }) => {
                 };
 
                 if (r.id.toString().startsWith('new-')) {
-                    // SI ES NUEVO: CREAR RUTINA Y ASIGNAR AL ALUMNO
                     const resRoutine = await axios.post(`${API_URL}/routines/`, { 
                         ...payload, 
                         routine_group_id: parseInt(groupId) 
@@ -325,7 +328,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate, studentId }) => {
 
                     const newRoutineId = resRoutine.data.id;
 
-                    // ESTO ES LO QUE FALTABA: CREAR LA ASIGNACIÓN PARA QUE APAREZCA EN LA APP
+                    // IMPORTANTE: Al ser un día nuevo de un grupo ya existente, lo asignamos para que aparezca
                     return axios.post(`${API_URL}/assignments/`, {
                         student_id: parseInt(studentId),
                         routine_id: newRoutineId,
@@ -334,7 +337,6 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate, studentId }) => {
                     }, { headers: { Authorization: `Bearer ${authToken}` } });
 
                 } else {
-                    // SI YA EXISTÍA: SOLO ACTUALIZAR
                     return axios.patch(`${API_URL}/routines/${r.id}`, payload, { headers: { Authorization: `Bearer ${authToken}` } });
                 }
             });
@@ -890,7 +892,14 @@ const StudentDashboard = ({ navigate }) => {
             }
             groupsMap.get(key).items.push(a);
         });
-        return Array.from(groupsMap.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        // ORDENAMOS los días dentro de cada grupo por ID o por un campo 'orden' si existe
+        const result = Array.from(groupsMap.values());
+        result.forEach(g => {
+            g.items.sort((a, b) => (a.routine.id - b.routine.id));
+        });
+        
+        return result.sort((a, b) => new Date(b.date) - new Date(a.date));
     }, [assignments]);
 
     return (
@@ -1043,13 +1052,19 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
             groupsMap.get(key).items.push(a);
             if (a.is_active) groupsMap.get(key).is_active = true;
         });
-        return Array.from(groupsMap.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        const result = Array.from(groupsMap.values());
+        result.forEach(g => {
+            // Ordenamos los días por su ID
+            g.items.sort((a, b) => (a.routine.id - b.routine.id));
+        });
+
+        return result.sort((a, b) => new Date(b.date) - new Date(a.date));
     }, [assignments]);
 
     return (
         <div className="flex flex-col p-4 text-left flex-1">
             <div className="max-w-4xl mx-auto w-full flex flex-col flex-1 text-left">
-                {/* IMPORTANTE: PASAMOS EL studentId AL MODAL PARA LAS NUEVAS ASIGNACIONES */}
                 <EditGroupModal isVisible={editModalVisible} group={selectedGroupToEdit} studentId={studentId} onClose={() => setEditModalVisible(false)} onUpdate={fetchAssignments} />
                 
                 <header className="mb-6 text-left">
@@ -1297,7 +1312,19 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
         setIsSaving(true);
         const payload = {
             student_id: parseInt(studentId), nombre: groupData.name, fecha_vencimiento: groupData.due_date, days: groupData.days,
-            routines: routines.map(r => ({ nombre: r.nombre, descripcion: r.descripcion || "", exercises: r.exercises.map((ex, idx) => ({ exercise_id: ex.id, sets: parseInt(ex.sets) || 0, repetitions: ex.repetitions.toString(), peso: ex.peso.toString(), notas: ex.notas || "", order: idx + 1 })) }))
+            routines: routines.map((r, rIdx) => ({ 
+                nombre: r.nombre, 
+                descripcion: r.descripcion || "", 
+                orden: rIdx + 1, // Mantenemos el orden
+                exercises: r.exercises.map((ex, idx) => ({ 
+                    exercise_id: ex.id, 
+                    sets: parseInt(ex.sets) || 0, 
+                    repetitions: ex.repetitions.toString(), 
+                    peso: ex.peso.toString(), 
+                    notas: ex.notas || "", 
+                    order: idx + 1 
+                })) 
+            }))
         };
         try { await axios.post(`${API_URL}/routines-group/create-transactional`, payload, { headers: { Authorization: `Bearer ${authToken}` } }); navigate('dashboard'); } 
         catch (e) { } finally { setIsSaving(false); }
