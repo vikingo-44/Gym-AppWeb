@@ -234,6 +234,11 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
     const [routines, setRoutines] = useState([]);
     const [loading, setLoading] = useState(false);
     const [expandedIdx, setExpandedIdx] = useState(null);
+    
+    // Estados para la biblioteca de ejercicios dentro del editor
+    const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+    const [currentDayIdx, setCurrentDayIdx] = useState(null);
+    const [availableExercises, setAvailableExercises] = useState([]);
 
     useEffect(() => {
         if (isVisible && group) {
@@ -245,14 +250,18 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                 descripcion: a.routine.descripcion || "",
                 exercises: a.routine.exercise_links.map(el => ({ ...el }))
             })));
+            
+            // Cargar ejercicios por si quiere agregar nuevos
+            axios.get(`${API_URL}/exercises/`, { headers: { Authorization: `Bearer ${authToken}` } })
+                .then(r => setAvailableExercises(r.data))
+                .catch(e => console.error(e));
         }
-    }, [isVisible, group]);
+    }, [isVisible, group, authToken, API_URL]);
 
-    // Función para añadir un nuevo día a la rutina existente
     const handleAddDay = () => {
         const nextNum = routines.length + 1;
         setRoutines([...routines, {
-            id: `new-${Date.now()}`, // ID temporal para el render
+            id: `new-${Date.now()}`,
             nombre: `DIA ${nextNum}`,
             descripcion: "",
             exercises: []
@@ -260,7 +269,6 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
         setExpandedIdx(routines.length);
     };
 
-    // Función para eliminar un día
     const handleRemoveDay = (idx) => {
         if (!window.confirm("¿ESTÁS SEGURO DE ELIMINAR ESTE DÍA COMPLETO?")) return;
         const n = [...routines];
@@ -274,37 +282,36 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
         try {
             const groupId = group.id.toString().replace('group-', '');
             
-            // 1. Actualizar Plan General
+            // 1. Actualizar datos del grupo
             await axios.patch(`${API_URL}/routines-group/${groupId}`, { 
                 nombre: name, 
                 fecha_vencimiento: dueDate 
             }, { headers: { Authorization: `Bearer ${authToken}` } });
 
-            // 2. Procesar Rutinas (Días)
-            // Para simplificar y que el backend lo tome bien, usamos una transacción si estuviera disponible,
-            // sino, el flujo lógico aquí es actualizar las existentes y crear las nuevas.
-            // NOTA: Esta implementación asume que el backend gestiona la sincronización.
-            
+            // 2. Actualizar o Crear cada rutina (Día)
             const routinePromises = routines.map(r => {
                 const payload = {
                     nombre: r.nombre,
                     descripcion: r.descripcion,
                     exercises: r.exercises.map((ex, idx) => ({
-                        exercise_id: ex.exercise?.id || ex.exercise_id,
-                        sets: parseInt(ex.sets),
-                        repetitions: ex.repetitions.toString(),
-                        peso: ex.peso.toString(),
+                        // CLAVE: Detectar si el ejercicio viene del backend (nested) o es nuevo de la biblioteca
+                        exercise_id: ex.exercise?.id || ex.id || ex.exercise_id,
+                        sets: parseInt(ex.sets) || 0,
+                        repetitions: (ex.repetitions || "0").toString(),
+                        peso: (ex.peso || "0").toString(),
                         notas: ex.notas || "",
                         order: idx + 1
                     }))
                 };
 
                 if (r.id.toString().startsWith('new-')) {
-                    // Si es nuevo, se debería crear y asignar al grupo. 
-                    // Para este código, enviamos el PATCH si el ID existe, 
-                    // Si el backend requiere POST para nuevos, se ajustaría aquí.
-                    return axios.post(`${API_URL}/routines/`, { ...payload, routine_group_id: parseInt(groupId) }, { headers: { Authorization: `Bearer ${authToken}` } });
+                    // Si es un día nuevo creado en este modal
+                    return axios.post(`${API_URL}/routines/`, { 
+                        ...payload, 
+                        routine_group_id: parseInt(groupId) 
+                    }, { headers: { Authorization: `Bearer ${authToken}` } });
                 } else {
+                    // Si es un día que ya existía
                     return axios.patch(`${API_URL}/routines/${r.id}`, payload, { headers: { Authorization: `Bearer ${authToken}` } });
                 }
             });
@@ -325,10 +332,30 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
 
     return (
         <div className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-xl overflow-y-auto pt-10 pb-20 px-4">
+            
+            {/* Selector de ejercicios dentro del editor */}
+            <ExerciseSelectorModal 
+                isVisible={isSelectorOpen}
+                onClose={() => setIsSelectorOpen(false)}
+                existingExercises={availableExercises}
+                setAvailableExercises={setAvailableExercises}
+                onAddExercise={(ex) => {
+                    const n = [...routines];
+                    n[currentDayIdx].exercises.push({
+                        ...ex,
+                        sets: 3,
+                        repetitions: "10",
+                        peso: "0",
+                        notas: ""
+                    });
+                    setRoutines(n);
+                }}
+            />
+
             <div className="bg-[#1C1C1E] w-full max-w-2xl mx-auto rounded-[2.5rem] border border-gray-800 p-8 shadow-2xl relative">
                 <div className="flex justify-between items-center mb-8">
                     <h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter">AJUSTAR PLAN</h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={32}/></button>
+                    <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors"><X size={32}/></button>
                 </div>
                 
                 <div className="space-y-6">
@@ -366,7 +393,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                 {expandedIdx === rIdx && (
                                     <div className="p-4 space-y-4 border-t border-gray-800/50 text-left">
                                         <div className="bg-black border border-gray-800 rounded-xl p-3">
-                                            <label className="text-[8px] font-black text-[#A9A9A9] uppercase mb-1 block">Nombre del Día (Edit)</label>
+                                            <label className="text-[8px] font-black text-[#A9A9A9] uppercase mb-1 block">Nombre del Día</label>
                                             <input 
                                                 value={r.nombre} 
                                                 onChange={e => {
@@ -387,7 +414,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                         {r.exercises.map((ex, eIdx) => (
                                             <div key={eIdx} className="bg-[#1C1C1E] p-4 rounded-xl border border-gray-800 shadow-inner">
                                                 <div className="flex justify-between items-center mb-3">
-                                                    <p className="text-[#3ABFBC] font-black uppercase text-[11px] italic">{ex.exercise?.nombre || "Ejercicio"}</p>
+                                                    <p className="text-[#3ABFBC] font-black uppercase text-[11px] italic">{ex.exercise?.nombre || ex.nombre || "Ejercicio"}</p>
                                                     <button onClick={() => {
                                                         const n = [...routines];
                                                         n[rIdx].exercises.splice(eIdx, 1);
@@ -420,7 +447,13 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                             </div>
                                         ))}
                                         
-                                        <p className="text-[9px] text-center text-gray-600 font-black uppercase italic">Para añadir ejercicios usa el creador de rutinas principal</p>
+                                        {/* BOTÓN PARA AÑADIR EJERCICIOS A ESTE DÍA ESPECÍFICO */}
+                                        <button 
+                                            onClick={() => { setCurrentDayIdx(rIdx); setIsSelectorOpen(true); }}
+                                            className="w-full border-2 border-dashed border-gray-800 h-14 rounded-2xl text-gray-500 font-black uppercase text-[9px] tracking-widest mt-2 flex items-center justify-center gap-2 hover:border-[#3ABFBC] hover:text-[#3ABFBC] transition-all"
+                                        >
+                                            <Plus size={16}/> AÑADIR EJERCICIO
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -673,6 +706,18 @@ const ProfessorDashboard = ({ navigate }) => {
         }
     };
 
+    const handleDeleteStudent = async (student) => {
+        if (!window.confirm(`¿ESTÁS SEGURO DE ELIMINAR A ${student.nombre.toUpperCase()}? ESTA ACCIÓN NO SE PUEDE DESHACER.`)) return;
+        
+        try {
+            await axios.delete(`${API_URL}/users/student/${student.id}`, { headers: { Authorization: `Bearer ${authToken}` } });
+            setToast({ msg: "ALUMNO ELIMINADO", type: "success" });
+            setStudents(prev => prev.filter(s => s.id !== student.id));
+        } catch (e) {
+            setToast({ msg: "ERROR AL ELIMINAR", type: "error" });
+        }
+    };
+
     const filtered = (students || [])
         .filter(s => (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || (s.dni || "").toString().includes(search))
         .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
@@ -750,6 +795,15 @@ const ProfessorDashboard = ({ navigate }) => {
                                         strokeWidth={3}
                                     />
                                 </div>
+                                
+                                <button 
+                                    onClick={() => handleDeleteStudent(s)}
+                                    className="absolute top-4 right-4 z-20 p-2 text-gray-700 hover:text-red-500 transition-colors"
+                                    title="Eliminar Alumno"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+
                                 <div className="flex items-center mb-6 relative z-10">
                                     <div className="w-12 h-12 rounded-2xl bg-[#3ABFBC] flex items-center justify-center mr-4 shadow-lg shrink-0"><User size={24} color="black" /></div>
                                     <div className="min-w-0 flex-1 overflow-hidden">
