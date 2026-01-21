@@ -234,6 +234,9 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
     const [routines, setRoutines] = useState([]);
     const [loading, setLoading] = useState(false);
     const [expandedIdx, setExpandedIdx] = useState(null);
+    const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+    const [currentRIdx, setCurrentRIdx] = useState(null);
+    const [availableExercises, setAvailableExercises] = useState([]);
 
     useEffect(() => {
         if (isVisible && group) {
@@ -245,8 +248,10 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                 descripcion: a.routine.descripcion || "",
                 exercises: a.routine.exercise_links.map(el => ({ ...el }))
             })));
+            axios.get(`${API_URL}/exercises/`, { headers: { Authorization: `Bearer ${authToken}` } })
+                .then(r => setAvailableExercises(r.data));
         }
-    }, [isVisible, group]);
+    }, [isVisible, group, authToken, API_URL]);
 
     const handleAddDay = () => {
         const nextNum = routines.length + 1;
@@ -281,10 +286,11 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                     nombre: r.nombre,
                     descripcion: r.descripcion,
                     exercises: r.exercises.map((ex, idx) => ({
-                        exercise_id: ex.exercise?.id || ex.exercise_id,
-                        sets: parseInt(ex.sets),
-                        repetitions: ex.repetitions.toString(),
-                        peso: ex.peso.toString(),
+                        // Maneja tanto ejercicios existentes (con objeto nested) como nuevos (ID directo)
+                        exercise_id: ex.exercise?.id || ex.id || ex.exercise_id,
+                        sets: parseInt(ex.sets) || 0,
+                        repetitions: (ex.repetitions || "0").toString(),
+                        peso: (ex.peso || "0").toString(),
                         notas: ex.notas || "",
                         order: idx + 1
                     }))
@@ -313,6 +319,23 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
 
     return (
         <div className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-xl overflow-y-auto pt-10 pb-20 px-4">
+            <ExerciseSelectorModal 
+                isVisible={isSelectorOpen} 
+                onClose={() => setIsSelectorOpen(false)}
+                existingExercises={availableExercises}
+                setAvailableExercises={setAvailableExercises}
+                onAddExercise={(ex) => {
+                    const n = [...routines];
+                    n[currentRIdx].exercises.push({
+                        ...ex,
+                        sets: 3,
+                        repetitions: "10",
+                        peso: "0",
+                        notas: ""
+                    });
+                    setRoutines(n);
+                }}
+            />
             <div className="bg-[#1C1C1E] w-full max-w-2xl mx-auto rounded-[2.5rem] border border-gray-800 p-8 shadow-2xl relative">
                 <div className="flex justify-between items-center mb-8">
                     <h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter">AJUSTAR PLAN</h2>
@@ -375,7 +398,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                         {r.exercises.map((ex, eIdx) => (
                                             <div key={eIdx} className="bg-[#1C1C1E] p-4 rounded-xl border border-gray-800 shadow-inner">
                                                 <div className="flex justify-between items-center mb-3">
-                                                    <p className="text-[#3ABFBC] font-black uppercase text-[11px] italic">{ex.exercise?.nombre || "Ejercicio"}</p>
+                                                    <p className="text-[#3ABFBC] font-black uppercase text-[11px] italic">{ex.exercise?.nombre || ex.nombre || "Ejercicio"}</p>
                                                     <button onClick={() => {
                                                         const n = [...routines];
                                                         n[rIdx].exercises.splice(eIdx, 1);
@@ -408,7 +431,12 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                             </div>
                                         ))}
                                         
-                                        <p className="text-[9px] text-center text-gray-600 font-black uppercase italic">Para añadir ejercicios usa el creador de rutinas principal</p>
+                                        <button 
+                                            onClick={() => { setCurrentRIdx(rIdx); setIsSelectorOpen(true); }}
+                                            className="w-full border border-dashed border-gray-700 h-12 rounded-xl text-gray-500 font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 hover:border-[#3ABFBC] hover:text-[#3ABFBC] transition-all"
+                                        >
+                                            <Plus size={14}/> Añadir Ejercicio
+                                        </button>
                                     </div>
                                 )}
                             </div>
