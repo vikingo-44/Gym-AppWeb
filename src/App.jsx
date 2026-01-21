@@ -234,6 +234,9 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
     const [routines, setRoutines] = useState([]);
     const [loading, setLoading] = useState(false);
     const [expandedIdx, setExpandedIdx] = useState(null);
+    const [availableExercises, setAvailableExercises] = useState([]);
+    const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+    const [currentDayIdx, setCurrentDayIdx] = useState(0);
 
     useEffect(() => {
         if (isVisible && group) {
@@ -243,31 +246,35 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                 id: a.routine.id,
                 nombre: a.routine.nombre,
                 descripcion: a.routine.descripcion || "",
-                exercises: a.routine.exercise_links.map(el => ({ ...el }))
+                exercises: a.routine.exercise_links.map(el => ({ 
+                    exercise_id: el.exercise_id, 
+                    exercise: el.exercise, 
+                    sets: el.sets, 
+                    repetitions: el.repetitions, 
+                    peso: el.peso, 
+                    notas: el.notas 
+                }))
             })));
+            axios.get(`${API_URL}/exercises/`, { headers: { Authorization: `Bearer ${authToken}` } }).then(r => setAvailableExercises(r.data));
         }
-    }, [isVisible, group]);
+    }, [isVisible, group, authToken, API_URL]);
 
-    // --- CORRECCIÓN CRÍTICA EN ESTA FUNCIÓN ---
     const handleSave = async () => {
         setLoading(true);
         try {
             const groupId = group.id.toString().replace('group-', '');
+            const studentId = group.items[0]?.student_id;
             
-            // 1. Actualizar cabecera del grupo (Plan)
-            // Si es un "solo-" podría fallar si el backend no lo soporta, pero asumimos estructura de grupo.
             await axios.patch(`${API_URL}/routines-group/${groupId}`, { 
                 nombre: name, 
                 fecha_vencimiento: dueDate 
             }, { headers: { Authorization: `Bearer ${authToken}` } });
 
-            // 2. Actualizar rutinas en paralelo para mayor velocidad
-            const routinePromises = routines.map(r => 
-                axios.patch(`${API_URL}/routines/${r.id}`, {
+            const routinePromises = routines.map(r => {
+                const routineData = {
                     nombre: r.nombre,
                     descripcion: r.descripcion,
                     exercises: r.exercises.map((ex, idx) => ({
-                        // Aseguramos que el ID del ejercicio esté presente
                         exercise_id: ex.exercise?.id || ex.exercise_id,
                         sets: parseInt(ex.sets),
                         repetitions: ex.repetitions.toString(),
@@ -275,30 +282,44 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                         notas: ex.notas || "",
                         order: idx + 1
                     }))
-                }, { headers: { Authorization: `Bearer ${authToken}` } })
-            );
+                };
+
+                if (r.id) {
+                    return axios.patch(`${API_URL}/routines/${r.id}`, routineData, { headers: { Authorization: `Bearer ${authToken}` } });
+                } else {
+                    return axios.post(`${API_URL}/routines-group/${groupId}/student/${studentId}/add-routine`, routineData, { headers: { Authorization: `Bearer ${authToken}` } });
+                }
+            });
 
             await Promise.all(routinePromises);
-
-            // Refrescar datos y cerrar modal SOLO si todo salió bien
             if (onUpdate) await onUpdate();
             onClose();
 
         } catch (e) {
             console.error("Error al guardar cambios:", e);
-            alert("Error al guardar los cambios. Revisa la consola o intenta nuevamente.");
         } finally {
-            // SIEMPRE apagar el loading, pase lo que pase
             setLoading(false);
         }
     };
-    // ------------------------------------------
 
     if (!isVisible) return null;
 
     return (
-        <div className="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4 backdrop-blur-xl overflow-y-auto">
-            <div className="bg-[#1C1C1E] w-full max-w-2xl rounded-[2.5rem] border border-gray-800 p-8 shadow-2xl my-8">
+        <div className="fixed inset-0 z-[300] bg-black/95 flex justify-center items-start p-4 backdrop-blur-xl overflow-y-auto">
+            <ExerciseSelectorModal 
+                isVisible={isSelectorOpen} 
+                onClose={() => setIsSelectorOpen(false)} 
+                existingExercises={availableExercises} 
+                setAvailableExercises={setAvailableExercises}
+                onAddExercise={(ex) => { 
+                    const next = [...routines]; 
+                    const currentDay = { ...next[currentDayIdx] };
+                    currentDay.exercises = [...currentDay.exercises, { exercise_id: ex.id, exercise: ex, sets: 3, repetitions: "10", peso: "0", notas: '', order: currentDay.exercises.length + 1 }];
+                    next[currentDayIdx] = currentDay;
+                    setRoutines(next); 
+                }} 
+            />
+            <div className="bg-[#1C1C1E] w-full max-w-2xl rounded-[2.5rem] border border-gray-800 p-8 shadow-2xl my-10 relative">
                 <div className="flex justify-between items-center mb-8">
                     <h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter">AJUSTAR PLAN</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={32}/></button>
@@ -316,7 +337,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                     </div>
                     <div className="space-y-4">
                         {routines.map((r, rIdx) => (
-                            <div key={r.id} className="bg-black/40 border border-gray-800 rounded-2xl overflow-hidden">
+                            <div key={rIdx} className="bg-black/40 border border-gray-800 rounded-2xl overflow-hidden">
                                 <button onClick={() => setExpandedIdx(expandedIdx === rIdx ? null : rIdx)} className="w-full p-4 flex justify-between items-center hover:bg-white/5 transition-colors">
                                     <span className="text-white font-black uppercase italic text-sm">{r.nombre}</span>
                                     {expandedIdx === rIdx ? <ChevronUp size={18} className="text-[#3ABFBC]"/> : <ChevronDown size={18} className="text-gray-500"/>}
@@ -337,7 +358,16 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                         </div>
                                         {r.exercises.map((ex, eIdx) => (
                                             <div key={eIdx} className="bg-[#1C1C1E] p-4 rounded-xl border border-gray-800 shadow-inner">
-                                                <p className="text-[#3ABFBC] font-black uppercase text-[11px] mb-3 italic">{ex.exercise?.nombre || "Ejercicio"}</p>
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <p className="text-[#3ABFBC] font-black uppercase text-[11px] italic">{ex.exercise?.nombre || "Ejercicio"}</p>
+                                                    <button onClick={() => {
+                                                        const n = [...routines];
+                                                        const d = { ...n[rIdx] };
+                                                        d.exercises = d.exercises.filter((_, idx) => idx !== eIdx);
+                                                        n[rIdx] = d;
+                                                        setRoutines(n);
+                                                    }} className="text-red-500"><Trash2 size={16}/></button>
+                                                </div>
                                                 <div className="grid grid-cols-3 gap-2 mb-3">
                                                     <div>
                                                         <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block">Sets</label>
@@ -383,11 +413,13 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                                 }} className="w-full bg-black/50 p-2 rounded-lg border border-gray-800 text-[11px] text-gray-400 italic h-16 resize-none" placeholder="NOTAS DEL EJERCICIO..." />
                                             </div>
                                         ))}
+                                        <button onClick={() => { setCurrentDayIdx(rIdx); setIsSelectorOpen(true); }} className="w-full border border-dashed border-[#3ABFBC]/50 h-12 rounded-xl text-[#3ABFBC] font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2"><PlusCircle size={14}/> AÑADIR EJERCICIO</button>
                                     </div>
                                 )}
                             </div>
                         ))}
                     </div>
+                    <button onClick={() => setRoutines([...routines, { nombre: `DIA ${routines.length + 1}`, descripcion: '', exercises: [] }])} className="w-full bg-gray-800 border border-gray-700 h-14 rounded-2xl text-white font-black uppercase text-[10px] tracking-widest italic flex items-center justify-center gap-3"><PlusSquare size={20}/> AÑADIR NUEVO DÍA AL PLAN</button>
                 </div>
                 <div className="mt-10 flex gap-4">
                     <button onClick={onClose} className="flex-1 h-16 bg-gray-800 rounded-2xl text-white font-black uppercase text-xs tracking-widest active:scale-95 transition-all">CANCELAR</button>
@@ -1355,7 +1387,7 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
     };
 
     return (
-        <div className="fixed inset-0 z-[150] bg-black/95 flex items-center justify-center p-4 backdrop-blur-3xl text-left">
+        <div className="fixed inset-0 z-[400] bg-black/95 flex items-center justify-center p-4 backdrop-blur-3xl text-left">
             <div className="bg-[#1C1C1E] w-full max-w-xl rounded-[2.5rem] border border-gray-800 p-8 flex flex-col h-[80vh] shadow-2xl text-left">
                 <div className="flex justify-between items-center mb-6 text-left"><h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter text-left">BIBLIOTECA</h2><button onClick={onClose} className="text-gray-500 hover:text-white transition-transform"><X size={32}/></button></div>
                 {isCreating ? (
