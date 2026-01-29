@@ -701,14 +701,14 @@ const ProfessorDashboard = ({ navigate }) => {
 
 	const filtered = (students || [])
 		.filter(s => {
+			// Buscador por nombre o DNI
 			const matchesSearch = (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || 
 								 (s.dni || "").toString().includes(search);
 			
-			// DATO REAL DEL BACKEND (main.py)
-			const isActive = s.has_active_routine; 
+			// Filtro por estado (usando el dato real del servidor: has_active_routine)
+			if (statusFilter === 'Activas') return matchesSearch && s.has_active_routine === true;
+			if (statusFilter === 'Vencidas') return matchesSearch && s.has_active_routine === false;
 			
-			if (statusFilter === 'Activas') return matchesSearch && isActive === true;
-			if (statusFilter === 'Vencidas') return matchesSearch && isActive === false;
 			return matchesSearch;
 		})
 		.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
@@ -748,55 +748,60 @@ const ProfessorDashboard = ({ navigate }) => {
             </header>
 
             <main className="p-4 flex-1 text-left">
-                <div className="max-w-2xl mx-auto flex flex-col md:flex-row items-center gap-4 mb-8 text-left">
-                    <div className="relative flex-1 w-full mb-4">
-						<Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
-						<input 
-							className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner text-left" 
-							placeholder="BUSCAR ALUMNO..." 
-							value={search} 
-							onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-						/>
+                <div className="max-w-2xl mx-auto w-full mb-8">
+					{/* FILA SUPERIOR: BUSCADOR Y PAGINACIÓN */}
+					<div className="flex flex-col md:flex-row items-center gap-4 mb-4">
+						{/* BUSCADOR: Ahora con flex-1 ocupará todo el ancho disponible */}
+						<div className="relative flex-1 w-full">
+							<Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
+							<input 
+								className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner text-left" 
+								placeholder="BUSCAR ALUMNO..." 
+								value={search} 
+								onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+							/>
+						</div>
+
+						{/* PAGINACIÓN: Se mantiene compacta a la derecha en PC */}
+						<div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
+							<button 
+								onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+								disabled={currentPage === 1}
+								className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
+							>
+								<ChevronLeft size={20} />
+							</button>
+							<div className="px-2 text-center min-w-[100px]">
+								<span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block leading-none mb-1 text-center">Paginado</span>
+								<span className="text-white font-black italic text-[11px] tabular-nums whitespace-nowrap text-center">{paginationLabel}</span>
+							</div>
+							<button 
+								onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+								disabled={currentPage === totalPages || totalPages === 0}
+								className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
+							>
+								<ChevronRight size={20} />
+							</button>
+						</div>
 					</div>
-					
-					{/* BOTONES DE FILTRO (AGREGADOS ABAJO PARA NO ROMPER EL DISEÑO) */}
-					<div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+
+					{/* FILA INFERIOR: BOTONES DE FILTRO (TODOS - ACTIVAS - VENCIDAS) */}
+					<div className="flex justify-center md:justify-start gap-2 overflow-x-auto pb-2 custom-scrollbar">
 						{['Todos', 'Activas', 'Vencidas'].map((f) => (
 							<button
 								key={f}
 								onClick={() => { setStatusFilter(f); setCurrentPage(1); }}
-								className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border ${
+								className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border ${
 									statusFilter === f 
 									? 'bg-[#3ABFBC] text-black border-[#3ABFBC] shadow-[0_0_15px_rgba(58,191,188,0.4)]' 
-									: 'bg-[#1C1C1E] text-gray-500 border-gray-800'
+									: 'bg-[#1C1C1E] text-gray-500 border-gray-800 hover:border-gray-600'
 								}`}
 							>
 								{f}
 							</button>
 						))}
 					</div>
-
-                    <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
-                        <button 
-                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                            disabled={currentPage === 1}
-                            className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
-                        >
-                            <ChevronLeft size={20} />
-                        </button>
-                        <div className="px-2 text-center min-w-[100px]">
-                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block leading-none mb-1 text-center">Paginado</span>
-                            <span className="text-white font-black italic text-[11px] tabular-nums whitespace-nowrap text-center">{paginationLabel}</span>
-                        </div>
-                        <button 
-                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                            disabled={currentPage === totalPages || totalPages === 0}
-                            className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
-                        >
-                            <ChevronRight size={20} />
-                        </button>
-                    </div>
-                </div>
+				</div>
 
                 {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-16 text-left">
