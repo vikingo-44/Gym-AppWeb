@@ -656,6 +656,7 @@ const ProfessorDashboard = ({ navigate }) => {
     const [showProfile, setShowProfile] = useState(false);
     const [toast, setToast] = useState({ msg: '', type: '' });
     const [resetConfirm, setResetConfirm] = useState({ visible: false, student: null, password: '', loading: false });
+	const [onlyExpired, setOnlyExpired] = useState(false); // <--- NUEVO ESTADO
 
     const [currentPage, setCurrentPage] = useState(1);
     const studentsPerPage = 20;
@@ -690,8 +691,17 @@ const ProfessorDashboard = ({ navigate }) => {
     };
 
     const filtered = (students || [])
-        .filter(s => (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || (s.dni || "").toString().includes(search))
-        .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
+    .filter(s => {
+        // Coincidencia por nombre o DNI
+        const matchesSearch = (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || 
+                              (s.dni || "").toString().includes(search);
+        
+        // Coincidencia por filtro de vencidos
+        const matchesExpired = onlyExpired ? s.is_plan_expired === true : true;
+
+        return matchesSearch && matchesExpired;
+    })
+    .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
 
     const totalPages = Math.ceil(filtered.length / studentsPerPage);
     const startIndex = (currentPage - 1) * studentsPerPage;
@@ -734,6 +744,20 @@ const ProfessorDashboard = ({ navigate }) => {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
                         <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
                     </div>
+					
+					{/* --- NUEVO BOTÓN DE FILTRO --- */}
+					<button 
+						onClick={() => setOnlyExpired(!onlyExpired)}
+						className={`h-14 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest italic flex items-center gap-2 transition-all shadow-lg active:scale-95 ${
+							onlyExpired 
+							? 'bg-red-600 text-white border-red-400' 
+							: 'bg-gray-800 text-gray-500 border-gray-700'
+						} border`}
+					>
+						<AlertCircle size={16} />
+						{onlyExpired ? "MOSTRANDO VENCIDOS" : "FILTRAR VENCIDOS"}
+					</button>
+					{/* ---------------------------- */}
 
                     <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
                         <button 
