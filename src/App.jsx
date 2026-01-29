@@ -38,6 +38,15 @@ const formatTimestamp = (isoString) => {
     });
 };
 
+// Verifica si una fecha de vencimiento ya pasó
+const isRoutineExpired = (dueDate) => {
+    if (!dueDate) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalizamos a medianoche
+    const expiry = new Date(dueDate);
+    return expiry < today;
+};
+
 const generateRandomPassword = () => {
     return Math.random().toString(36).slice(-8);
 };
@@ -690,8 +699,15 @@ const ProfessorDashboard = ({ navigate }) => {
     };
 
     const filtered = (students || [])
-        .filter(s => (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || (s.dni || "").toString().includes(search))
-        .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
+    .filter(s => {
+        const matchesSearch = (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || (s.dni || "").toString().includes(search);
+        const expired = isRoutineExpired(s.latest_due_date);
+        
+        if (statusFilter === 'Activas') return matchesSearch && !expired;
+        if (statusFilter === 'Vencidas') return matchesSearch && expired;
+        return matchesSearch;
+    })
+    .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
 
     const totalPages = Math.ceil(filtered.length / studentsPerPage);
     const startIndex = (currentPage - 1) * studentsPerPage;
@@ -733,6 +749,21 @@ const ProfessorDashboard = ({ navigate }) => {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
                         <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner text-left" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
                     </div>
+					
+					{/* BOTONES DE FILTRO */}
+						<div className="flex gap-2 mt-4 mb-2 overflow-x-auto pb-2 custom-scrollbar">
+							{['Todos', 'Activas', 'Vencidas'].map((f) => (
+								<button
+									key={f}
+									onClick={() => { setStatusFilter(f); setCurrentPage(1); }}
+									className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+										statusFilter === f ? 'bg-[#3ABFBC] text-black shadow-[0_0_15px_rgba(58,191,188,0.4)]' : 'bg-gray-800 text-gray-400'
+									}`}
+								>
+									{f}
+								</button>
+							))}
+						</div>
 
                     <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
                         <button 
@@ -771,6 +802,15 @@ const ProfessorDashboard = ({ navigate }) => {
                                     <div className="min-w-0 flex-1 overflow-hidden text-left">
                                         <h3 className="text-sm font-black italic text-white uppercase truncate text-left">{s.nombre}</h3>
                                         <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate text-left">{s.email}</p>
+										
+										{/* INDICADOR DE RUTINA VENCIDA/ACTIVA */}
+										<div className="mt-2 flex items-center gap-2">
+											<div className={`w-2.5 h-2.5 rounded-full ${isRoutineExpired(s.latest_due_date) ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : 'bg-green-500 shadow-[0_0_10px_#22c55e]'}`} />
+											<span className={`text-[9px] font-black uppercase tracking-widest italic ${isRoutineExpired(s.latest_due_date) ? 'text-red-500' : 'text-green-500'}`}>
+												{isRoutineExpired(s.latest_due_date) ? 'Rutina Vencida' : 'Rutina Activa'}
+											</span>
+										</div>
+										
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-4 gap-2 relative z-10">
@@ -1348,6 +1388,7 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
 const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExercises, setAvailableExercises }) => {
     const { authToken, API_URL } = useAuth();
     const [search, setSearch] = useState('');
+	const [statusFilter, setStatusFilter] = useState('Todos');
     const [filterMuscle, setFilterMuscle] = useState('Todos');
     const [newEx, setNewEx] = useState({ nombre: '', grupo_muscular: 'Pectoral' });
     const [isCreating, setIsCreating] = useState(false);
