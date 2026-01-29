@@ -38,15 +38,6 @@ const formatTimestamp = (isoString) => {
     });
 };
 
-// Verifica si una fecha de vencimiento ya pasó
-const isRoutineExpired = (dueDate) => {
-    if (!dueDate) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalizamos a medianoche
-    const expiry = new Date(dueDate);
-    return expiry < today;
-};
-
 const generateRandomPassword = () => {
     return Math.random().toString(36).slice(-8);
 };
@@ -660,7 +651,6 @@ const ProfessorDashboard = ({ navigate }) => {
     const [students, setStudents] = useState([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
-	const [statusFilter, setStatusFilter] = useState('Todos');
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [showInfo, setShowInfo] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
@@ -699,19 +689,9 @@ const ProfessorDashboard = ({ navigate }) => {
         }
     };
 
-	const filtered = (students || [])
-		.filter(s => {
-			// Buscador por nombre o DNI
-			const matchesSearch = (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || 
-								 (s.dni || "").toString().includes(search);
-			
-			// Filtro por estado (usando el dato real del servidor: has_active_routine)
-			if (statusFilter === 'Activas') return matchesSearch && s.has_active_routine === true;
-			if (statusFilter === 'Vencidas') return matchesSearch && s.has_active_routine === false;
-			
-			return matchesSearch;
-		})
-		.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
+    const filtered = (students || [])
+        .filter(s => (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || (s.dni || "").toString().includes(search))
+        .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
 
     const totalPages = Math.ceil(filtered.length / studentsPerPage);
     const startIndex = (currentPage - 1) * studentsPerPage;
@@ -748,60 +728,33 @@ const ProfessorDashboard = ({ navigate }) => {
             </header>
 
             <main className="p-4 flex-1 text-left">
-                <div className="max-w-2xl mx-auto w-full mb-8">
-					{/* FILA SUPERIOR: BUSCADOR Y PAGINACIÓN */}
-					<div className="flex flex-col md:flex-row items-center gap-4 mb-4">
-						{/* BUSCADOR: Ahora con flex-1 ocupará todo el ancho disponible */}
-						<div className="relative flex-1 w-full">
-							<Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
-							<input 
-								className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner text-left" 
-								placeholder="BUSCAR ALUMNO..." 
-								value={search} 
-								onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-							/>
-						</div>
+                <div className="max-w-2xl mx-auto flex flex-col md:flex-row items-center gap-4 mb-8 text-left">
+                    <div className="relative flex-1 w-full">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
+                        <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner text-left" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
+                    </div>
 
-						{/* PAGINACIÓN: Se mantiene compacta a la derecha en PC */}
-						<div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
-							<button 
-								onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-								disabled={currentPage === 1}
-								className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
-							>
-								<ChevronLeft size={20} />
-							</button>
-							<div className="px-2 text-center min-w-[100px]">
-								<span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block leading-none mb-1 text-center">Paginado</span>
-								<span className="text-white font-black italic text-[11px] tabular-nums whitespace-nowrap text-center">{paginationLabel}</span>
-							</div>
-							<button 
-								onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-								disabled={currentPage === totalPages || totalPages === 0}
-								className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
-							>
-								<ChevronRight size={20} />
-							</button>
-						</div>
-					</div>
-
-					{/* FILA INFERIOR: BOTONES DE FILTRO (TODOS - ACTIVAS - VENCIDAS) */}
-					<div className="flex justify-center md:justify-start gap-2 overflow-x-auto pb-2 custom-scrollbar">
-						{['Todos', 'Activas', 'Vencidas'].map((f) => (
-							<button
-								key={f}
-								onClick={() => { setStatusFilter(f); setCurrentPage(1); }}
-								className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border ${
-									statusFilter === f 
-									? 'bg-[#3ABFBC] text-black border-[#3ABFBC] shadow-[0_0_15px_rgba(58,191,188,0.4)]' 
-									: 'bg-[#1C1C1E] text-gray-500 border-gray-800 hover:border-gray-600'
-								}`}
-							>
-								{f}
-							</button>
-						))}
-					</div>
-				</div>
+                    <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
+                        <button 
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
+                        <div className="px-2 text-center min-w-[100px]">
+                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block leading-none mb-1 text-center">Paginado</span>
+                            <span className="text-white font-black italic text-[11px] tabular-nums whitespace-nowrap text-center">{paginationLabel}</span>
+                        </div>
+                        <button 
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages || totalPages === 0}
+                            className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
+                        >
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
+                </div>
 
                 {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#3ABFBC]" size={40}/></div> : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-16 text-left">
@@ -818,15 +771,6 @@ const ProfessorDashboard = ({ navigate }) => {
                                     <div className="min-w-0 flex-1 overflow-hidden text-left">
                                         <h3 className="text-sm font-black italic text-white uppercase truncate text-left">{s.nombre}</h3>
                                         <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate text-left">{s.email}</p>
-										
-										{/* INDICADOR VISUAL RECONECTADO AL BACKEND */}
-										<div className="mt-2 flex items-center gap-2">
-											<div className={`w-2.5 h-2.5 rounded-full ${s.has_active_routine ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`} />
-											<span className={`text-[9px] font-black uppercase tracking-widest italic ${s.has_active_routine ? 'text-green-500' : 'text-red-500'}`}>
-												{s.has_active_routine ? 'Rutina Activa' : 'Rutina Vencida / Inactiva'}
-											</span>
-										</div>
-										
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-4 gap-2 relative z-10">
