@@ -660,6 +660,7 @@ const ProfessorDashboard = ({ navigate }) => {
     const [students, setStudents] = useState([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
+	const [statusFilter, setStatusFilter] = useState('Todos');
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [showInfo, setShowInfo] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
@@ -700,9 +701,14 @@ const ProfessorDashboard = ({ navigate }) => {
 
     const filtered = (students || [])
     .filter(s => {
-        const matchesSearch = (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || (s.dni || "").toString().includes(search);
+        // Buscamos por nombre o DNI
+        const matchesSearch = (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || 
+                             (s.dni || "").toString().includes(search);
+        
+        // Calculamos si la rutina está vencida
         const expired = isRoutineExpired(s.latest_due_date);
         
+        // Aplicamos el botón de filtro seleccionado
         if (statusFilter === 'Activas') return matchesSearch && !expired;
         if (statusFilter === 'Vencidas') return matchesSearch && expired;
         return matchesSearch;
@@ -751,19 +757,21 @@ const ProfessorDashboard = ({ navigate }) => {
                     </div>
 					
 					{/* BOTONES DE FILTRO */}
-						<div className="flex gap-2 mt-4 mb-2 overflow-x-auto pb-2 custom-scrollbar">
-							{['Todos', 'Activas', 'Vencidas'].map((f) => (
-								<button
-									key={f}
-									onClick={() => { setStatusFilter(f); setCurrentPage(1); }}
-									className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
-										statusFilter === f ? 'bg-[#3ABFBC] text-black shadow-[0_0_15px_rgba(58,191,188,0.4)]' : 'bg-gray-800 text-gray-400'
-									}`}
-								>
-									{f}
-								</button>
-							))}
-						</div>
+					<div className="flex gap-2 mt-4 mb-2 overflow-x-auto pb-2 custom-scrollbar">
+						{['Todos', 'Activas', 'Vencidas'].map((f) => (
+							<button
+								key={f}
+								onClick={() => { setStatusFilter(f); setCurrentPage(1); }}
+								className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+									statusFilter === f 
+									? 'bg-[#3ABFBC] text-black shadow-[0_0_15px_rgba(58,191,188,0.4)]' 
+									: 'bg-gray-800 text-gray-400 border border-gray-700'
+								}`}
+							>
+								{f}
+							</button>
+						))}
+					</div>
 
                     <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
                         <button 
@@ -805,7 +813,7 @@ const ProfessorDashboard = ({ navigate }) => {
 										
 										{/* INDICADOR DE RUTINA VENCIDA/ACTIVA */}
 										<div className="mt-2 flex items-center gap-2">
-											<div className={`w-2.5 h-2.5 rounded-full ${isRoutineExpired(s.latest_due_date) ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : 'bg-green-500 shadow-[0_0_10px_#22c55e]'}`} />
+											<div className={`w-2 h-2 rounded-full ${isRoutineExpired(s.latest_due_date) ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : 'bg-green-500 shadow-[0_0_8px_#22c55e]'}`} />
 											<span className={`text-[9px] font-black uppercase tracking-widest italic ${isRoutineExpired(s.latest_due_date) ? 'text-red-500' : 'text-green-500'}`}>
 												{isRoutineExpired(s.latest_due_date) ? 'Rutina Vencida' : 'Rutina Activa'}
 											</span>
@@ -1388,7 +1396,6 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
 const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExercises, setAvailableExercises }) => {
     const { authToken, API_URL } = useAuth();
     const [search, setSearch] = useState('');
-	const [statusFilter, setStatusFilter] = useState('Todos');
     const [filterMuscle, setFilterMuscle] = useState('Todos');
     const [newEx, setNewEx] = useState({ nombre: '', grupo_muscular: 'Pectoral' });
     const [isCreating, setIsCreating] = useState(false);
