@@ -699,21 +699,24 @@ const ProfessorDashboard = ({ navigate }) => {
         }
     };
 
-    const filtered = (students || [])
-    .filter(s => {
-        // Buscamos por nombre o DNI
-        const matchesSearch = (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || 
-                             (s.dni || "").toString().includes(search);
-        
-        // Calculamos si la rutina está vencida
-        const expired = isRoutineExpired(s.latest_due_date);
-        
-        // Aplicamos el botón de filtro seleccionado
-        if (statusFilter === 'Activas') return matchesSearch && !expired;
-        if (statusFilter === 'Vencidas') return matchesSearch && expired;
-        return matchesSearch;
-    })
-    .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
+	const filtered = (students || [])
+		.filter(s => {
+			const matchesSearch = (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || 
+								 (s.dni || "").toString().includes(search);
+			
+			// Una rutina es "realmente activa" solo si no venció Y está marcada como activa
+			const isActuallyActive = !isRoutineExpired(s.latest_due_date) && s.is_active !== false;
+			
+			if (statusFilter === 'Activas') {
+				return matchesSearch && isActuallyActive;
+			}
+			if (statusFilter === 'Vencidas') {
+				// Mostramos las que vencieron O las que el profe desactivó manualmente
+				return matchesSearch && !isActuallyActive;
+			}
+			return matchesSearch;
+		})
+		.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
 
     const totalPages = Math.ceil(filtered.length / studentsPerPage);
     const startIndex = (currentPage - 1) * studentsPerPage;
@@ -811,13 +814,21 @@ const ProfessorDashboard = ({ navigate }) => {
                                         <h3 className="text-sm font-black italic text-white uppercase truncate text-left">{s.nombre}</h3>
                                         <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate text-left">{s.email}</p>
 										
-										{/* INDICADOR DE RUTINA VENCIDA/ACTIVA */}
-										<div className="mt-2 flex items-center gap-2">
-											<div className={`w-2 h-2 rounded-full ${isRoutineExpired(s.latest_due_date) ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : 'bg-green-500 shadow-[0_0_8px_#22c55e]'}`} />
-											<span className={`text-[9px] font-black uppercase tracking-widest italic ${isRoutineExpired(s.latest_due_date) ? 'text-red-500' : 'text-green-500'}`}>
-												{isRoutineExpired(s.latest_due_date) ? 'Rutina Vencida' : 'Rutina Activa'}
-											</span>
-										</div>
+										{/* INDICADOR VISUAL CORREGIDO */}
+											<div className="mt-2 flex items-center gap-2">
+												<div className={`w-2.5 h-2.5 rounded-full ${
+													(isRoutineExpired(s.latest_due_date) || s.is_active === false) 
+													? 'bg-red-500 shadow-[0_0_10px_#ef4444]' 
+													: 'bg-green-500 shadow-[0_0_10px_#22c55e]'
+												}`} />
+												<span className={`text-[9px] font-black uppercase tracking-widest italic ${
+													(isRoutineExpired(s.latest_due_date) || s.is_active === false) 
+													? 'text-red-500' 
+													: 'text-green-500'
+												}`}>
+													{(isRoutineExpired(s.latest_due_date) || s.is_active === false) ? 'Rutina Inactiva / Vencida' : 'Rutina Activa'}
+												</span>
+											</div>
 										
                                     </div>
                                 </div>
