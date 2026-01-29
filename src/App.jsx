@@ -764,8 +764,8 @@ const ProfessorDashboard = ({ navigate }) => {
 							
 								{/* Buscá esto dentro de tu paginatedStudents.map */}
 								{s.is_plan_expired === true && (
-									<div className="absolute top-3 right-3 z-30 flex items-center gap-2 bg-red-500/20 border border-red-500 px-2 py-1 rounded-lg">
-										<div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+									<div className="absolute top-3 right-3 z-30 flex items-center gap-2 bg-red-500/20 border border-red-500 px-2 py-1 rounded-lg shadow-[0_0_10px_rgba(239,68,68,0.3)]">
+										<div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
 										<span className="text-[9px] font-black text-red-500 italic">VENCIDA</span>
 									</div>
 								)}
