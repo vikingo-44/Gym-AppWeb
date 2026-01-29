@@ -761,6 +761,15 @@ const ProfessorDashboard = ({ navigate }) => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-16">
                         {paginatedStudents.map(s => (
                             <div key={s.id} className="bg-[#1C1C1E]/80 backdrop-blur-sm rounded-3xl p-5 border border-gray-800 shadow-2xl group transition-all relative overflow-hidden min-h-[160px] text-left">
+							
+								{/* 1. AGREGAR AQUÍ EL INDICADOR DE VENCIMIENTO */}
+								{s.is_plan_expired && (
+									<div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-red-500/10 border border-red-500/40 px-2 py-1 rounded-lg animate-pulse">
+										<div className="w-1.5 h-1.5 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,1)]"></div>
+										<span className="text-[8px] font-black text-red-500 uppercase italic tracking-tighter">VENCIDA</span>
+									</div>
+								)}
+							
                                 <div className="absolute -right-4 -bottom-4 pointer-events-none z-0">
                                     <Dumbbell 
                                         className="text-white opacity-[0.04] w-28 h-28 -rotate-12 group-hover:scale-110 transition-transform duration-700" 
