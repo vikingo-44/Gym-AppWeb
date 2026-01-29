@@ -762,11 +762,11 @@ const ProfessorDashboard = ({ navigate }) => {
                         {paginatedStudents.map(s => (
                             <div key={s.id} className="bg-[#1C1C1E]/80 backdrop-blur-sm rounded-3xl p-5 border border-gray-800 shadow-2xl group transition-all relative overflow-hidden min-h-[160px] text-left">
 							
-								{/* 1. AGREGAR AQUÍ EL INDICADOR DE VENCIMIENTO */}
-								{s.is_plan_expired && (
-									<div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-red-500/10 border border-red-500/40 px-2 py-1 rounded-lg animate-pulse">
-										<div className="w-1.5 h-1.5 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,1)]"></div>
-										<span className="text-[8px] font-black text-red-500 uppercase italic tracking-tighter">VENCIDA</span>
+								{/* Buscá esto dentro de tu paginatedStudents.map */}
+								{s.is_plan_expired === true && (
+									<div className="absolute top-3 right-3 z-30 flex items-center gap-2 bg-red-500/20 border border-red-500 px-2 py-1 rounded-lg">
+										<div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+										<span className="text-[9px] font-black text-red-500 italic">VENCIDA</span>
 									</div>
 								)}
 							
