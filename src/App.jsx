@@ -704,11 +704,11 @@ const ProfessorDashboard = ({ navigate }) => {
 			const matchesSearch = (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || 
 								 (s.dni || "").toString().includes(search);
 			
-			// Usamos el campo real de tu base de datos
+			// DATO REAL DEL BACKEND (main.py)
 			const isActive = s.has_active_routine; 
 			
-			if (statusFilter === 'Activas') return matchesSearch && isActive;
-			if (statusFilter === 'Vencidas') return matchesSearch && !isActive;
+			if (statusFilter === 'Activas') return matchesSearch && isActive === true;
+			if (statusFilter === 'Vencidas') return matchesSearch && isActive === false;
 			return matchesSearch;
 		})
 		.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
@@ -749,18 +749,23 @@ const ProfessorDashboard = ({ navigate }) => {
 
             <main className="p-4 flex-1 text-left">
                 <div className="max-w-2xl mx-auto flex flex-col md:flex-row items-center gap-4 mb-8 text-left">
-                    <div className="relative flex-1 w-full">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
-                        <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner text-left" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
-                    </div>
+                    <div className="relative flex-1 w-full mb-4">
+						<Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
+						<input 
+							className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner text-left" 
+							placeholder="BUSCAR ALUMNO..." 
+							value={search} 
+							onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+						/>
+					</div>
 					
 					{/* BOTONES DE FILTRO (AGREGADOS ABAJO PARA NO ROMPER EL DISEÑO) */}
-					<div className="flex gap-2 mt-4 overflow-x-auto pb-2 custom-scrollbar">
+					<div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
 						{['Todos', 'Activas', 'Vencidas'].map((f) => (
 							<button
 								key={f}
 								onClick={() => { setStatusFilter(f); setCurrentPage(1); }}
-								className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border ${
+								className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border ${
 									statusFilter === f 
 									? 'bg-[#3ABFBC] text-black border-[#3ABFBC] shadow-[0_0_15px_rgba(58,191,188,0.4)]' 
 									: 'bg-[#1C1C1E] text-gray-500 border-gray-800'
@@ -809,7 +814,7 @@ const ProfessorDashboard = ({ navigate }) => {
                                         <h3 className="text-sm font-black italic text-white uppercase truncate text-left">{s.nombre}</h3>
                                         <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate text-left">{s.email}</p>
 										
-										{/* INDICADOR VISUAL DEFINITIVO */}
+										{/* INDICADOR VISUAL RECONECTADO AL BACKEND */}
 										<div className="mt-2 flex items-center gap-2">
 											<div className={`w-2.5 h-2.5 rounded-full ${s.has_active_routine ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`} />
 											<span className={`text-[9px] font-black uppercase tracking-widest italic ${s.has_active_routine ? 'text-green-500' : 'text-red-500'}`}>
