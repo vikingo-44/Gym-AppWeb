@@ -258,6 +258,17 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
         }
     }, [isVisible, group, authToken, API_URL]);
 
+    // Función para reordenar ejercicios dentro del modal de edición
+    const moveExerciseInEdit = (dayIdx, fromIdx, toIdx) => {
+        if (toIdx < 0 || toIdx >= routines[dayIdx].exercises.length) return;
+        const n = [...routines];
+        const exercises = [...n[dayIdx].exercises];
+        const [movedItem] = exercises.splice(fromIdx, 1);
+        exercises.splice(toIdx, 0, movedItem);
+        n[dayIdx].exercises = exercises;
+        setRoutines(n);
+    };
+
     const handleAddDay = () => {
         const nextNum = routines.length + 1;
         setRoutines([...routines, {
@@ -415,11 +426,30 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                             <div key={eIdx} className="bg-[#1C1C1E] p-4 rounded-xl border border-gray-800 shadow-inner">
                                                 <div className="flex justify-between items-center mb-3">
                                                     <p className="text-[#3ABFBC] font-black uppercase text-[11px] italic">{ex.exercise?.nombre || ex.nombre || "Ejercicio"}</p>
-                                                    <button onClick={() => {
-                                                        const n = [...routines];
-                                                        n[rIdx].exercises.splice(eIdx, 1);
-                                                        setRoutines(n);
-                                                    }} className="text-red-900 hover:text-red-500"><Trash2 size={14}/></button>
+                                                    <div className="flex items-center gap-1">
+                                                        {/* Botones para reordenar ejercicios en edición */}
+                                                        <button 
+                                                            onClick={() => moveExerciseInEdit(rIdx, eIdx, eIdx - 1)} 
+                                                            disabled={eIdx === 0}
+                                                            className="text-gray-600 hover:text-[#3ABFBC] p-1 disabled:opacity-0 transition-all"
+                                                        >
+                                                            <ChevronUp size={18}/>
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => moveExerciseInEdit(rIdx, eIdx, eIdx + 1)} 
+                                                            disabled={eIdx === r.exercises.length - 1}
+                                                            className="text-gray-600 hover:text-[#3ABFBC] p-1 disabled:opacity-0 transition-all"
+                                                        >
+                                                            <ChevronDown size={18}/>
+                                                        </button>
+                                                        <button onClick={() => {
+                                                            const n = [...routines];
+                                                            n[rIdx].exercises.splice(eIdx, 1);
+                                                            setRoutines(n);
+                                                        }} className="text-red-900 hover:text-red-500 ml-1">
+                                                            <Trash2 size={16}/>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <div className="grid grid-cols-3 gap-2 mb-3">
                                                     <div>
@@ -1381,7 +1411,7 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
                                                     <p className="text-white font-black uppercase text-sm italic tracking-widest group-hover:text-[#3ABFBC] transition-colors">{ex.nombre}</p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    {/* --- NUEVOS BOTONES PARA REORDENAR --- */}
+                                                    {/* --- BOTONES PARA REORDENAR --- */}
                                                     <button onClick={() => moveExercise(dIdx, eIdx, eIdx - 1)} className="text-gray-600 hover:text-[#3ABFBC] p-1"><ChevronUp size={20}/></button>
                                                     <button onClick={() => moveExercise(dIdx, eIdx, eIdx + 1)} className="text-gray-600 hover:text-[#3ABFBC] p-1"><ChevronDown size={20}/></button>
                                                     
