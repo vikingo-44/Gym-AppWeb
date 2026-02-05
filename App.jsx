@@ -663,7 +663,7 @@ const LoginPage = () => {
 // ----------------------------------------------------------------------
 // 6. DASHBOARD PROFESOR
 // ----------------------------------------------------------------------
-const ProfessorDashboard = ({ navigate }) => {
+const ProfessorDashboard = ({ navigate, currentPage, setCurrentPage }) => {
     const { authToken, API_URL, signOut, userData } = useAuth();
     const [students, setStudents] = useState([]);
     const [search, setSearch] = useState('');
@@ -673,8 +673,10 @@ const ProfessorDashboard = ({ navigate }) => {
     const [showProfile, setShowProfile] = useState(false);
     const [toast, setToast] = useState({ msg: '', type: '' });
     const [resetConfirm, setResetConfirm] = useState({ visible: false, student: null, password: '', loading: false });
+    
+    // --- NUEVO ESTADO PARA EL FILTRO TRIPLE ---
+    const [filterType, setFilterType] = useState('todos'); // 'todos', 'vencidos', 'sin_rutina'
 
-    const [currentPage, setCurrentPage] = useState(1);
     const studentsPerPage = 20;
 
     const refresh = useCallback(() => {
@@ -718,8 +720,16 @@ const ProfessorDashboard = ({ navigate }) => {
         }
     };
 
+    // --- LÓGICA DE FILTRADO ACTUALIZADA ---
     const filtered = (students || [])
-        .filter(s => (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || (s.dni || "").toString().includes(search))
+        .filter(s => {
+            const matchesSearch = (s.nombre || "").toLowerCase().includes(search.toLowerCase()) || 
+                                  (s.dni || "").toString().includes(search);
+            
+            if (filterType === 'vencidos') return matchesSearch && s.is_plan_expired;
+            if (filterType === 'sin_rutina') return matchesSearch && !s.has_routine;
+            return matchesSearch;
+        })
         .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
 
     const totalPages = Math.ceil(filtered.length / studentsPerPage);
@@ -731,7 +741,7 @@ const ProfessorDashboard = ({ navigate }) => {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [search]);
+    }, [search, filterType]);
 
     return (
         <div className="flex flex-col text-left flex-1">
@@ -757,30 +767,54 @@ const ProfessorDashboard = ({ navigate }) => {
             </header>
 
             <main className="p-4 flex-1">
-                <div className="max-w-2xl mx-auto flex flex-col md:flex-row items-center gap-4 mb-8">
-                    <div className="relative flex-1 w-full">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
-                        <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
+                <div className="max-w-2xl mx-auto flex flex-col gap-4 mb-8">
+                    <div className="flex flex-col md:flex-row items-center gap-4">
+                        <div className="relative flex-1 w-full">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
+                            <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
+                        </div>
+
+                        <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
+                            <button 
+                                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                                disabled={currentPage === 1}
+                                className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
+                            >
+                                <ChevronLeft size={20} />
+                            </button>
+                            <div className="px-2 text-center min-w-[100px]">
+                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block leading-none mb-1">Paginado</span>
+                                <span className="text-white font-black italic text-[11px] tabular-nums whitespace-nowrap">{paginationLabel}</span>
+                            </div>
+                            <button 
+                                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                                disabled={currentPage === totalPages || totalPages === 0}
+                                className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
+                            >
+                                <ChevronRight size={20} />
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
+                    {/* --- NUEVA BARRA DE FILTROS --- */}
+                    <div className="flex p-1 bg-[#1C1C1E] border border-gray-800 rounded-2xl w-full">
                         <button 
-                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                            disabled={currentPage === 1}
-                            className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
+                            onClick={() => setFilterType('todos')} 
+                            className={`flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest italic transition-all ${filterType === 'todos' ? 'bg-gray-700 text-[#3ABFBC]' : 'text-gray-500'}`}
                         >
-                            <ChevronLeft size={20} />
+                            TODOS
                         </button>
-                        <div className="px-2 text-center min-w-[100px]">
-                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block leading-none mb-1">Paginado</span>
-                            <span className="text-white font-black italic text-[11px] tabular-nums whitespace-nowrap">{paginationLabel}</span>
-                        </div>
                         <button 
-                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                            disabled={currentPage === totalPages || totalPages === 0}
-                            className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-[#3ABFBC] disabled:opacity-20 active:scale-90 transition-all shadow-inner"
+                            onClick={() => setFilterType('vencidos')} 
+                            className={`flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest italic transition-all flex items-center justify-center gap-2 ${filterType === 'vencidos' ? 'bg-red-600/20 text-red-500 border border-red-500/30' : 'text-gray-500'}`}
                         >
-                            <ChevronRight size={20} />
+                            <AlertCircle size={14} /> VENCIDOS
+                        </button>
+                        <button 
+                            onClick={() => setFilterType('sin_rutina')} 
+                            className={`flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest italic transition-all flex items-center justify-center gap-2 ${filterType === 'sin_rutina' ? 'bg-[#3ABFBC]/10 text-[#3ABFBC] border border-[#3ABFBC]/20' : 'text-gray-500'}`}
+                        >
+                            <PlusSquare size={14} /> SIN RUTINA
                         </button>
                     </div>
                 </div>
@@ -805,7 +839,7 @@ const ProfessorDashboard = ({ navigate }) => {
                                 </button>
 
                                 <div className="flex items-center mb-6 relative z-10">
-                                    <div className="w-12 h-12 rounded-2xl bg-[#3ABFBC] flex items-center justify-center mr-4 shadow-lg shrink-0"><User size={24} color="black" /></div>
+                                    <div className={`w-12 h-12 rounded-2xl ${s.is_plan_expired ? 'bg-red-600' : 'bg-[#3ABFBC]'} flex items-center justify-center mr-4 shadow-lg shrink-0`}><User size={24} color={s.is_plan_expired ? "white" : "black"} /></div>
                                     <div className="min-w-0 flex-1 overflow-hidden">
                                         <h3 className="text-sm font-black italic text-white uppercase truncate text-left">{s.nombre}</h3>
                                         <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate text-left">{s.email}</p>
@@ -1125,6 +1159,9 @@ const App = () => {
     const { isAuthenticated, isProfessor, isLoading: authLoading } = useAuth();
     const [currentScreen, setCurrentScreen] = useState('login');
     const [temp, setTemp] = useState({});
+    
+    // --- ESTADO PARA PERSISTIR LA HOJA DEL DASHBOARD ---
+    const [dashboardPage, setDashboardPage] = useState(1);
 
     const navigate = useCallback((s, d = {}) => { setTemp(d); setCurrentScreen(s); }, []);
 
@@ -1168,7 +1205,7 @@ const App = () => {
     const renderScreen = () => {
         switch (currentScreen) {
             case 'login': return <LoginPage />;
-            case 'dashboard': return isProfessor ? <ProfessorDashboard navigate={navigate} /> : <StudentDashboard navigate={navigate} />;
+            case 'dashboard': return isProfessor ? <ProfessorDashboard navigate={navigate} currentPage={dashboardPage} setCurrentPage={setDashboardPage} /> : <StudentDashboard navigate={navigate} />;
             case 'addStudent': return <AddStudentPage navigate={navigate} />;
             case 'createRoutineGroup': return <RoutineGroupPage navigate={navigate} studentId={temp.studentId} studentName={temp.studentName} />;
             case 'viewRoutine': return <StudentRoutineView navigate={navigate} studentId={temp.studentId} studentName={temp.studentName} />;
@@ -1344,8 +1381,10 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
                                                     <p className="text-white font-black uppercase text-sm italic tracking-widest group-hover:text-[#3ABFBC] transition-colors">{ex.nombre}</p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
+                                                    {/* --- NUEVOS BOTONES PARA REORDENAR --- */}
                                                     <button onClick={() => moveExercise(dIdx, eIdx, eIdx - 1)} className="text-gray-600 hover:text-[#3ABFBC] p-1"><ChevronUp size={20}/></button>
                                                     <button onClick={() => moveExercise(dIdx, eIdx, eIdx + 1)} className="text-gray-600 hover:text-[#3ABFBC] p-1"><ChevronDown size={20}/></button>
+                                                    
                                                     <button onClick={() => {
                                                         const n = [...routines]; 
                                                         const updatedDay = { ...n[dIdx] };
@@ -1556,5 +1595,6 @@ const AppWrapper = () => (
         `}</style>
     </AuthProvider>
 );
+
 
 export default AppWrapper;
