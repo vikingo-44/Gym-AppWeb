@@ -234,6 +234,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
     const [routines, setRoutines] = useState([]);
     const [loading, setLoading] = useState(false);
     const [expandedIdx, setExpandedIdx] = useState(null);
+    const [msg, setMsg] = useState({ text: '', type: '' });
     
     // Estados para la biblioteca de ejercicios dentro del editor
     const [isSelectorOpen, setIsSelectorOpen] = useState(false);
@@ -250,6 +251,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                 descripcion: a.routine.descripcion || "",
                 exercises: a.routine.exercise_links.map(el => ({ ...el }))
             })));
+            setMsg({ text: '', type: '' });
             
             // Cargar ejercicios por si quiere agregar nuevos
             axios.get(`${API_URL}/exercises/`, { headers: { Authorization: `Bearer ${authToken}` } })
@@ -257,6 +259,17 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                 .catch(e => console.error(e));
         }
     }, [isVisible, group, authToken, API_URL]);
+
+    // Función para reordenar ejercicios dentro del modal de edición
+    const moveExerciseInEdit = (dayIdx, fromIdx, toIdx) => {
+        if (toIdx < 0 || toIdx >= routines[dayIdx].exercises.length) return;
+        const n = [...routines];
+        const exercises = [...n[dayIdx].exercises];
+        const [movedItem] = exercises.splice(fromIdx, 1);
+        exercises.splice(toIdx, 0, movedItem);
+        n[dayIdx].exercises = exercises;
+        setRoutines(n);
+    };
 
     const handleAddDay = () => {
         const nextNum = routines.length + 1;
@@ -279,6 +292,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
 
     const handleSave = async () => {
         setLoading(true);
+        setMsg({ text: '', type: '' });
         try {
             const groupId = group.id.toString().replace('group-', '');
             
@@ -317,12 +331,14 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
             });
 
             await Promise.all(routinePromises);
+            setMsg({ text: 'CAMBIOS GUARDADOS EXITOSAMENTE', type: 'success' });
             if (onUpdate) await onUpdate();
-            onClose();
+            setTimeout(() => onClose(), 1500);
 
         } catch (e) {
             console.error("Error al guardar cambios:", e);
-            alert("Error al guardar los cambios.");
+            const detail = e.response?.data?.detail || "ERROR AL GUARDAR";
+            setMsg({ text: detail.toString().toUpperCase(), type: 'error' });
         } finally {
             setLoading(false);
         }
@@ -331,7 +347,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
     if (!isVisible) return null;
 
     return (
-        <div className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-xl overflow-y-auto pt-10 pb-20 px-4">
+        <div className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-xl overflow-y-auto pt-10 pb-20 px-4 text-left">
             
             {/* Selector de ejercicios dentro del editor */}
             <ExerciseSelectorModal 
@@ -352,11 +368,19 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                 }}
             />
 
-            <div className="bg-[#1C1C1E] w-full max-w-2xl mx-auto rounded-[2.5rem] border border-gray-800 p-8 shadow-2xl relative">
+            <div className="bg-[#1C1C1E] w-full max-w-2xl mx-auto rounded-[2.5rem] border border-gray-800 p-8 shadow-2xl relative text-left">
                 <div className="flex justify-between items-center mb-8">
                     <h2 className="text-2xl font-black italic text-[#3ABFBC] uppercase tracking-tighter">AJUSTAR PLAN</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors"><X size={32}/></button>
                 </div>
+
+                {msg.text && (
+                    <div className={`mb-6 p-4 rounded-2xl text-[10px] font-black text-center uppercase tracking-widest border shadow-lg ${
+                        msg.type === 'error' ? 'bg-red-900/40 text-red-500 border-red-500/50' : 'bg-[#3ABFBC]/20 text-[#3ABFBC] border-[#3ABFBC]/50'
+                    }`}>
+                        {msg.text}
+                    </div>
+                )}
                 
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -381,7 +405,7 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                         {routines.map((r, rIdx) => (
                             <div key={r.id} className="bg-black/40 border border-gray-800 rounded-2xl overflow-hidden">
                                 <div className="flex items-center">
-                                    <button onClick={() => setExpandedIdx(expandedIdx === rIdx ? null : rIdx)} className="flex-1 p-4 flex justify-between items-center hover:bg-white/5 transition-colors">
+                                    <button onClick={() => setExpandedIdx(expandedIdx === rIdx ? null : rIdx)} className="flex-1 p-4 flex justify-between items-center hover:bg-white/5 transition-colors text-left">
                                         <span className="text-white font-black uppercase italic text-sm">{r.nombre}</span>
                                         {expandedIdx === rIdx ? <ChevronUp size={18} className="text-[#3ABFBC]"/> : <ChevronDown size={18} className="text-gray-500"/>}
                                     </button>
@@ -393,57 +417,76 @@ const EditGroupModal = ({ isVisible, onClose, group, onUpdate }) => {
                                 {expandedIdx === rIdx && (
                                     <div className="p-4 space-y-4 border-t border-gray-800/50 text-left">
                                         <div className="bg-black border border-gray-800 rounded-xl p-3">
-                                            <label className="text-[8px] font-black text-[#A9A9A9] uppercase mb-1 block">Nombre del Día</label>
+                                            <label className="text-[8px] font-black text-[#A9A9A9] uppercase mb-1 block text-left">Nombre del Día</label>
                                             <input 
                                                 value={r.nombre} 
                                                 onChange={e => {
                                                     const n=[...routines]; n[rIdx].nombre = e.target.value; setRoutines(n);
                                                 }}
-                                                className="w-full bg-transparent text-[#3ABFBC] font-black italic text-[14px] outline-none uppercase mb-2"
+                                                className="w-full bg-transparent text-[#3ABFBC] font-black italic text-[14px] outline-none uppercase mb-2 text-left"
                                             />
-                                            <label className="text-[8px] font-black text-[#A9A9A9] uppercase mb-1 block">Objetivo del Día</label>
+                                            <label className="text-[8px] font-black text-[#A9A9A9] uppercase mb-1 block text-left">Objetivo del Día</label>
                                             <textarea 
                                                 value={r.descripcion} 
                                                 onChange={e => {
                                                     const n=[...routines]; n[rIdx].descripcion = e.target.value; setRoutines(n);
                                                 }}
-                                                className="w-full bg-transparent text-white font-bold italic text-[12px] outline-none resize-none h-12 uppercase" 
+                                                className="w-full bg-transparent text-white font-bold italic text-[12px] outline-none resize-none h-12 uppercase text-left" 
                                             />
                                         </div>
 
                                         {r.exercises.map((ex, eIdx) => (
-                                            <div key={eIdx} className="bg-[#1C1C1E] p-4 rounded-xl border border-gray-800 shadow-inner">
+                                            <div key={eIdx} className="bg-[#1C1C1E] p-4 rounded-xl border border-gray-800 shadow-inner text-left">
                                                 <div className="flex justify-between items-center mb-3">
-                                                    <p className="text-[#3ABFBC] font-black uppercase text-[11px] italic">{ex.exercise?.nombre || ex.nombre || "Ejercicio"}</p>
-                                                    <button onClick={() => {
-                                                        const n = [...routines];
-                                                        n[rIdx].exercises.splice(eIdx, 1);
-                                                        setRoutines(n);
-                                                    }} className="text-red-900 hover:text-red-500"><Trash2 size={14}/></button>
+                                                    <p className="text-[#3ABFBC] font-black uppercase text-[11px] italic text-left">{ex.exercise?.nombre || ex.nombre || "Ejercicio"}</p>
+                                                    <div className="flex items-center gap-1">
+                                                        {/* Botones para reordenar ejercicios en edición */}
+                                                        <button 
+                                                            onClick={() => moveExerciseInEdit(rIdx, eIdx, eIdx - 1)} 
+                                                            disabled={eIdx === 0}
+                                                            className="text-gray-600 hover:text-[#3ABFBC] p-1 disabled:opacity-0 transition-all"
+                                                        >
+                                                            <ChevronUp size={18}/>
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => moveExerciseInEdit(rIdx, eIdx, eIdx + 1)} 
+                                                            disabled={eIdx === r.exercises.length - 1}
+                                                            className="text-gray-600 hover:text-[#3ABFBC] p-1 disabled:opacity-0 transition-all"
+                                                        >
+                                                            <ChevronDown size={18}/>
+                                                        </button>
+                                                        <button onClick={() => {
+                                                            const n = [...routines];
+                                                            n[rIdx].exercises.splice(eIdx, 1);
+                                                            setRoutines(n);
+                                                        }} className="text-red-900 hover:text-red-500 ml-1">
+                                                            <Trash2 size={16}/>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <div className="grid grid-cols-3 gap-2 mb-3">
                                                     <div>
                                                         <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block text-center">Sets</label>
                                                         <input type="number" value={ex.sets} onChange={e => {
                                                             const n=[...routines]; n[rIdx].exercises[eIdx].sets = e.target.value; setRoutines(n);
-                                                        }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs text-center" />
+                                                        }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs text-center outline-none" />
                                                     </div>
                                                     <div>
                                                         <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block text-center">Reps</label>
                                                         <input type="text" value={ex.repetitions} onChange={e => {
                                                             const n=[...routines]; n[rIdx].exercises[eIdx].repetitions = e.target.value; setRoutines(n);
-                                                        }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs text-center" />
+                                                        }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs text-center outline-none" />
                                                     </div>
                                                     <div>
                                                         <label className="text-[8px] font-black text-gray-500 uppercase mb-1 block text-center">Peso</label>
                                                         <input type="text" value={ex.peso} onChange={e => {
                                                             const n=[...routines]; n[rIdx].exercises[eIdx].peso = e.target.value; setRoutines(n);
-                                                        }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs text-center" />
+                                                        }} className="w-full bg-black rounded-lg p-2 text-white font-bold border border-gray-800 text-xs text-center outline-none" />
                                                     </div>
                                                 </div>
                                                 <textarea value={ex.notas || ""} onChange={e => {
                                                     const n=[...routines]; n[rIdx].exercises[eIdx].notas = e.target.value; setRoutines(n);
-                                                }} className="w-full bg-black/50 p-2 rounded-lg border border-gray-800 text-[11px] text-gray-400 italic h-16 resize-none" placeholder="NOTAS DEL EJERCICIO..." />
+                                                }} className="w-full bg-black/50 p-2 rounded-lg border border-gray-800 text-[11px] text-gray-400 italic h-16 resize-none outline-none text-left" placeholder="NOTAS DEL EJERCICIO..." />
                                             </div>
                                         ))}
                                         
@@ -510,9 +553,9 @@ const StudentInfoModal = ({ isVisible, onClose, student, onUpdate }) => {
                 <div className="text-center mb-6"><h2 className="text-2xl font-black italic text-white uppercase tracking-tighter">DATOS DEL ALUMNO</h2></div>
                 {msg.text && <div className={`mb-4 p-3 rounded-xl text-[10px] font-black text-center uppercase tracking-widest ${msg.type === 'error' ? 'bg-red-900/40 text-red-500 border border-red-500/50' : 'bg-[#3ABFBC]/20 text-[#3ABFBC] border border-[#3ABFBC]/50'}`}>{msg.text}</div>}
                 <div className="space-y-1">
-                    <label className="text-[11px] font-black text-[#A9A9A9] uppercase ml-2 mb-1 block tracking-widest">Nombre Completo</label>
+                    <label className="text-[11px] font-black text-[#A9A9A9] uppercase ml-2 mb-1 block tracking-widest text-left">Nombre Completo</label>
                     <Input placeholder="NOMBRE" Icon={User} value={editData.nombre} onChange={e => setEditData({...editData, nombre: e.target.value})} />
-                    <label className="text-[11px] font-black text-[#A9A9A9] uppercase ml-2 mb-1 block tracking-widest">Email</label>
+                    <label className="text-[11px] font-black text-[#A9A9A9] uppercase ml-2 mb-1 block tracking-widest text-left">Email</label>
                     <Input placeholder="EMAIL" Icon={Mail} value={editData.email} onChange={e => setEditData({...editData, email: e.target.value})} />
                 </div>
                 <button onClick={handleSave} disabled={loading} className="w-full bg-[#3ABFBC] h-14 rounded-2xl font-black text-black mt-6 uppercase italic shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95">
@@ -565,7 +608,7 @@ const ResetPasswordModal = ({ isVisible, onClose, targetUser, mode = 'profile' }
     };
 
     return (
-        <div className="fixed inset-0 z-[210] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[210] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm text-left">
             <div className="bg-[#1C1C1E] w-full max-sm:w-[95%] max-w-sm rounded-[2rem] border border-gray-800 p-8 shadow-2xl text-left">
                 <div className="text-center mb-6">
                     <Key size={32} strokeWidth={2.5} className="text-amber-500 mx-auto mb-2" />
@@ -574,9 +617,9 @@ const ResetPasswordModal = ({ isVisible, onClose, targetUser, mode = 'profile' }
                 </div>
                 {msg.text && <div className={`mb-4 p-3 rounded-xl text-[10px] font-black text-center uppercase tracking-widest ${msg.type === 'error' ? 'bg-red-900/40 text-red-500 border border-red-500/50' : 'bg-[#3ABFBC]/20 text-[#3ABFBC] border border-[#3ABFBC]/50'}`}>{msg.text}</div>}
                 <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-1 block tracking-widest">Clave Actual</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-1 block tracking-widest text-left">Clave Actual</label>
                     <Input placeholder="CLAVE ACTUAL" Icon={Lock} value={oldPass} onChange={e => setOldPass(e.target.value)} isPassword />
-                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mt-4 mb-1 block tracking-widest">Nueva Clave</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mt-4 mb-1 block tracking-widest text-left">Nueva Clave</label>
                     <Input placeholder="NUEVA CLAVE" Icon={Zap} value={newPass} onChange={e => setNewPass(e.target.value)} isPassword />
                     <Input placeholder="REPETIR CLAVE" Icon={CheckCircle} value={confirm} onChange={e => setConfirm(e.target.value)} isPassword />
                 </div>
@@ -771,7 +814,7 @@ const ProfessorDashboard = ({ navigate, currentPage, setCurrentPage }) => {
                     <div className="flex flex-col md:flex-row items-center gap-4">
                         <div className="relative flex-1 w-full">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
-                            <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
+                            <input className="w-full bg-[#1C1C1E]/80 backdrop-blur-sm h-14 pl-12 pr-4 rounded-2xl text-white font-bold outline-none border border-gray-800 focus:border-[#3ABFBC] text-[16px] shadow-inner text-left" placeholder="BUSCAR ALUMNO..." value={search} onChange={e => setSearch(e.target.value)}/>
                         </div>
 
                         <div className="flex items-center gap-3 bg-[#1C1C1E]/60 border border-gray-800 p-2 rounded-2xl shadow-xl shrink-0">
@@ -840,7 +883,7 @@ const ProfessorDashboard = ({ navigate, currentPage, setCurrentPage }) => {
 
                                 <div className="flex items-center mb-6 relative z-10">
                                     <div className={`w-12 h-12 rounded-2xl ${s.is_plan_expired ? 'bg-red-600' : 'bg-[#3ABFBC]'} flex items-center justify-center mr-4 shadow-lg shrink-0`}><User size={24} color={s.is_plan_expired ? "white" : "black"} /></div>
-                                    <div className="min-w-0 flex-1 overflow-hidden">
+                                    <div className="min-w-0 flex-1 overflow-hidden text-left">
                                         <h3 className="text-sm font-black italic text-white uppercase truncate text-left">{s.nombre}</h3>
                                         <p className="text-[10px] font-black text-[#A9A9A9] uppercase tracking-tighter italic leading-none mt-1 truncate text-left">{s.email}</p>
                                     </div>
@@ -918,7 +961,7 @@ const StudentDashboard = ({ navigate }) => {
                         <p className="text-[7px] sm:text-[8px] font-black text-[#A9A9A9] uppercase tracking-widest mt-1 italic text-left leading-none">MI ENTRENAMIENTO</p>
                     </div>
                 </div>
-                <div className="flex gap-1.5 sm:gap-2 shrink-0">
+                <div className="flex gap-1.5 sm:gap-2 shrink-0 text-left">
                     <button onClick={() => setShowProfile(true)} className="w-9 h-9 sm:w-10 sm:h-10 bg-amber-500 rounded-xl flex items-center justify-center text-black shadow-lg active:scale-95 transition-all"><Key size={18}/></button>
                     <button onClick={signOut} className="w-9 h-9 sm:w-10 sm:h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"><LogOut size={18}/></button>
                 </div>
@@ -937,12 +980,12 @@ const StudentDashboard = ({ navigate }) => {
                                 </div>
                             ) : groupedAssignments.map(group => (
                                 <div key={group.id} className="rounded-[2rem] border border-[#3ABFBC]/20 bg-gradient-to-b from-[#1C1C1E]/80 to-black/80 backdrop-blur-sm overflow-hidden shadow-2xl">
-                                    <div onClick={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)} className="p-6 flex justify-between items-center cursor-pointer active:bg-white/5 transition-colors">
+                                    <div onClick={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)} className="p-6 flex justify-between items-center cursor-pointer active:bg-white/5 transition-colors text-left">
                                         <div className="flex-1 min-w-0 pr-4 text-left">
                                             <h3 className="text-2xl font-black italic uppercase text-[#3ABFBC] tracking-tighter leading-none mb-3 truncate text-left">{group.name}</h3>
                                             <div className="space-y-1.5 text-left">
-                                                <div className="flex items-center gap-2"><Calendar size={14} className="text-[#3ABFBC]"/><p className="text-[12px] text-white font-black uppercase italic leading-none">VENCE: {formatDisplayDate(group.due_date)}</p></div>
-                                                <div className="flex items-center gap-2"><User size={14} className="text-amber-500"/><p className="text-[12px] text-[#A9A9A9] font-black uppercase italic leading-none">{group.professor_name}</p></div>
+                                                <div className="flex items-center gap-2 text-left"><Calendar size={14} className="text-[#3ABFBC]"/><p className="text-[12px] text-white font-black uppercase italic leading-none">VENCE: {formatDisplayDate(group.due_date)}</p></div>
+                                                <div className="flex items-center gap-2 text-left"><User size={14} className="text-amber-500"/><p className="text-[12px] text-[#A9A9A9] font-black uppercase italic leading-none">{group.professor_name}</p></div>
                                             </div>
                                         </div>
                                         <div className="bg-white/10 w-12 h-12 rounded-2xl flex items-center justify-center border border-gray-700 shadow-inner">
@@ -952,11 +995,11 @@ const StudentDashboard = ({ navigate }) => {
                                     {expandedGroup === group.id && (
                                         <div className="bg-black/40 border-t border-gray-800/50 p-4 space-y-4 animate-in slide-in-from-top-2">
                                             {group.items.map(a => (
-                                                <div key={a.id} className="bg-[#1C1C1E]/90 border border-gray-800 rounded-3xl overflow-hidden shadow-lg">
-                                                    <button onClick={() => setExpandedRoutine(expandedRoutine === a.id ? null : a.id)} className="w-full p-5 flex justify-between items-center hover:bg-white/5 transition-colors">
+                                                <div key={a.id} className="bg-[#1C1C1E]/90 border border-gray-800 rounded-3xl overflow-hidden shadow-lg text-left">
+                                                    <button onClick={() => setExpandedRoutine(expandedRoutine === a.id ? null : a.id)} className="w-full p-5 flex justify-between items-center hover:bg-white/5 transition-colors text-left">
                                                         <div className="text-left"><p className="text-white font-black uppercase text-lg italic leading-none text-left">{a.routine?.nombre}</p></div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{a.routine?.exercise_links?.length || 0} EJERCICIOS</span>
+                                                        <div className="flex items-center gap-2 text-left">
+                                                            <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest text-left">{a.routine?.exercise_links?.length || 0} EJERCICIOS</span>
                                                             <div className="w-8 h-8 rounded-lg bg-[#3ABFBC] flex items-center justify-center">
                                                                 {expandedRoutine === a.id ? <ChevronUp size={16} strokeWidth={2.5} className="text-black"/> : <ChevronDown size={16} strokeWidth={2.5} className="text-black"/>}
                                                             </div>
@@ -1089,7 +1132,7 @@ const StudentRoutineView = ({ navigate, studentId, studentName }) => {
                                         {group.is_active && <div className="mt-4 px-3 py-1.5 rounded-full bg-[#3ABFBC] text-black text-[10px] font-black uppercase inline-block italic">ASIGNACIÓN ACTIVA</div>}
                                     </div>
                                     <div className="flex flex-col gap-3 items-end shrink-0">
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 text-left">
                                             <button onClick={(e) => { e.stopPropagation(); setSelectedGroupToEdit(group); setEditModalVisible(true); }} className="w-12 h-12 bg-gray-800 rounded-2xl flex items-center justify-center text-[#3ABFBC] border border-gray-700 shadow-lg"><Edit3 size={20} /></button>
                                             <button onClick={(e) => { e.stopPropagation(); handleToggleGroupActive(group); }} disabled={updating} className={`px-5 py-3 h-12 rounded-xl text-[10px] font-black uppercase italic shadow-lg flex items-center gap-2 transition-all ${group.is_active ? 'bg-red-600 text-white' : 'bg-[#3ABFBC]'}`}>
                                                 {updating ? <Loader2 className="animate-spin" size={14}/> : group.is_active ? <><XIcon size={14}/> INACTIVAR</> : <><CheckCircle size={14}/> ACTIVAR</>}
@@ -1344,8 +1387,8 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
                         <Input placeholder="NOMBRE DEL PLAN" value={groupData.name} onChange={e => setGroupData({...groupData, name: e.target.value})} Icon={Zap} />
                         <Input type="date" value={groupData.due_date} onChange={e => setGroupData({...groupData, due_date: e.target.value})} Icon={Calendar} />
                         <div className="bg-[#1C1C1E]/80 backdrop-blur-sm p-10 rounded-[2.5rem] border border-gray-800 text-center shadow-2xl mt-6">
-                            <p className="text-[#A9A9A9] font-black uppercase text-[10px] tracking-widest mb-8 opacity-60 italic text-center">Variantes de Día / Bloques</p>
-                            <div className="flex justify-center items-center gap-10">
+                            <p className="text-[#A9A9A9] font-black uppercase text-[10px] tracking-widest mb-8 opacity-60 italic text-center text-left">Variantes de Día / Bloques</p>
+                            <div className="flex justify-center items-center gap-10 text-left">
                                 <button onClick={() => updateDaysCount(Math.max(1, groupData.days - 1))} className="w-14 h-14 bg-gray-800 border border-gray-700 text-white rounded-2xl flex items-center justify-center disabled:opacity-20 active:scale-90" disabled={groupData.days <= 1}><Minus strokeWidth={2.5}/></button>
                                 <span className="text-7xl font-black text-[#3ABFBC] italic tabular-nums text-center">{groupData.days}</span>
                                 <button onClick={() => updateDaysCount(Math.min(5, groupData.days + 1))} className="w-14 h-14 bg-[#3ABFBC] text-black rounded-2xl flex items-center justify-center disabled:opacity-20 active:scale-90" disabled={groupData.days >= 5}><Plus strokeWidth={2.5}/></button>
@@ -1376,12 +1419,12 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
                                             className="bg-black/50 p-5 rounded-2xl border border-gray-800 relative shadow-inner text-left group cursor-move hover:border-[#3ABFBC]/50 transition-colors"
                                         >
                                             <div className="flex justify-between items-center mb-4">
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-3 text-left">
                                                     <GripVertical size={18} className="text-gray-600 group-hover:text-[#3ABFBC]" />
                                                     <p className="text-white font-black uppercase text-sm italic tracking-widest group-hover:text-[#3ABFBC] transition-colors">{ex.nombre}</p>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    {/* --- NUEVOS BOTONES PARA REORDENAR --- */}
+                                                <div className="flex items-center gap-2 text-left">
+                                                    {/* --- BOTONES PARA REORDENAR --- */}
                                                     <button onClick={() => moveExercise(dIdx, eIdx, eIdx - 1)} className="text-gray-600 hover:text-[#3ABFBC] p-1"><ChevronUp size={20}/></button>
                                                     <button onClick={() => moveExercise(dIdx, eIdx, eIdx + 1)} className="text-gray-600 hover:text-[#3ABFBC] p-1"><ChevronDown size={20}/></button>
                                                     
@@ -1395,13 +1438,13 @@ const RoutineGroupPage = ({ navigate, studentId, studentName }) => {
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-3 gap-3 mb-4 text-left">
-                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Sets</label><input type="number" value={ex.sets} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], sets:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
-                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Reps</label><input type="text" value={ex.repetitions} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], repetitions:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
-                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Peso</label><input type="text" value={ex.peso} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], peso:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none"/></div>
+                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Sets</label><input type="number" value={ex.sets} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], sets:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none text-left"/></div>
+                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Reps</label><input type="text" value={ex.repetitions} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], repetitions:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none text-left"/></div>
+                                                <div><label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block">Peso</label><input type="text" value={ex.peso} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], peso:e.target.value}; n[dIdx]=d; setRoutines(n);}} className="w-full bg-black rounded-xl p-3 text-white text-center font-bold border border-gray-700 text-sm shadow-inner outline-none text-left"/></div>
                                             </div>
                                             <div className="text-left">
                                                 <label className="text-[9px] font-black text-[#A9A9A9] uppercase mb-1 block text-left">Indicaciones del Profesor</label>
-                                                <div className="flex items-start gap-3 bg-black border border-gray-800 rounded-xl p-3 focus-within:border-[#3ABFBC] transition-all">
+                                                <div className="flex items-start gap-3 bg-black border border-gray-800 rounded-xl p-3 focus-within:border-[#3ABFBC] transition-all text-left">
                                                     <textarea value={ex.notas} onChange={e => {const n = [...routines]; const d={...n[dIdx]}; d.exercises=[...d.exercises]; d.exercises[eIdx]={...d.exercises[eIdx], notas:e.target.value}; n[dIdx]=d; setRoutines(n);}} placeholder="EJ: DESCANSAR 60 SEG..." rows={1} className="flex-1 bg-transparent text-[12px] text-white font-bold outline-none resize-none placeholder:opacity-50 uppercase italic leading-none text-left" />
                                                 </div>
                                             </div>
@@ -1478,8 +1521,8 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
                     <div className="space-y-5 text-left">
                         <Input placeholder="NOMBRE" value={newEx.nombre} onChange={e => setNewEx({...newEx, nombre: e.target.value})} />
                         <label className="text-[11px] font-black text-gray-500 uppercase ml-2 mb-1 block tracking-widest text-left">Grupo Muscular</label>
-                        <select className="w-full bg-[#1C1C1E] h-14 rounded-2xl px-5 border border-gray-800 text-white font-black text-xs uppercase tracking-widest italic outline-none" value={newEx.grupo_muscular} onChange={e => setNewEx({...newEx, grupo_muscular: e.target.value})}>{muscleGroups.filter(m => m !== 'Todos').map(g => <option key={g} value={g}>{g}</option>)}</select>
-                        <div className="flex gap-4 pt-6 text-center">
+                        <select className="w-full bg-[#1C1C1E] h-14 rounded-2xl px-5 border border-gray-800 text-white font-black text-xs uppercase tracking-widest italic outline-none text-left" value={newEx.grupo_muscular} onChange={e => setNewEx({...newEx, grupo_muscular: e.target.value})}>{muscleGroups.filter(m => m !== 'Todos').map(g => <option key={g} value={g}>{g}</option>)}</select>
+                        <div className="flex gap-4 pt-6 text-center text-left">
                             <button onClick={() => setIsCreating(false)} className="flex-1 bg-gray-800 text-white h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest">CANCELAR</button>
                             <button onClick={handleCreateNew} disabled={loadingCreate} className="flex-1 bg-[#3ABFBC] text-black h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest italic flex items-center justify-center shadow-lg active:scale-95 transition-all">
                                 {loadingCreate ? <Loader2 className="animate-spin"/> : "CREAR"}
@@ -1494,7 +1537,7 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
                                 <input className="w-full bg-black border border-gray-800 h-14 pl-14 pr-6 rounded-2xl text-white text-sm font-bold outline-none focus:border-[#3ABFBC] text-left" placeholder="BUSCAR..." value={search} onChange={e => setSearch(e.target.value)} />
                             </div>
                             <div className="w-36 text-left">
-                                <select className="w-full bg-black border border-gray-800 h-14 px-4 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest italic outline-none focus:border-[#3ABFBC]" value={filterMuscle} onChange={e => setFilterMuscle(e.target.value)}>
+                                <select className="w-full bg-black border border-gray-800 h-14 px-4 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest italic outline-none focus:border-[#3ABFBC] text-left" value={filterMuscle} onChange={e => setFilterMuscle(e.target.value)}>
                                     {muscleGroups.map(m => <option key={m} value={m}>{m}</option>)}
                                 </select>
                             </div>
@@ -1506,11 +1549,11 @@ const ExerciseSelectorModal = ({ isVisible, onClose, onAddExercise, existingExer
                                 </div>
                             ) : filtered.map(ex => (
                                 <button key={ex.id} onClick={() => { onAddExercise(ex); onClose(); }} className="w-full p-5 bg-gradient-to-br from-black to-[#0d0d0d] rounded-2xl border border-gray-800 flex justify-between items-center group transition-all text-left shadow-lg">
-                                    <div className="text-left">
+                                    <div className="text-left text-left">
                                         <span className="text-white font-black uppercase text-sm block group-active:text-[#3ABFBC] text-left">{ex.nombre}</span>
                                         <span className="text-[10px] text-[#A9A9A9] font-black uppercase tracking-widest text-left">{ex.grupo_muscular}</span>
                                     </div>
-                                    <div className="w-10 h-10 rounded-xl bg-black border border-gray-800 flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-xl bg-black border border-gray-800 flex items-center justify-center text-left">
                                         <PlusCircle size={24} strokeWidth={2.5} className="opacity-40 group-hover:opacity-100 transition-opacity" />
                                     </div>
                                 </button>
